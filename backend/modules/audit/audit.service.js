@@ -71,7 +71,7 @@ const ROUTE_ACTIONS = [
   { method: "POST", pattern: /^\/notifications\/[^/]+\/read\/?$/, module: "Notifications", action: "Marked a notification as read" },
 ];
 
-const stripApiPrefix = (path) =>
+export const stripApiPrefix = (path) =>
   path.replace(/^\/api\/v\d+/, "").replace(/^\/api/, "");
 
 /** Safe path-based projectId extraction (string projectId, not numeric task id). */

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api } from "../../api";
 import { useNotification } from "../NotificationContext";
 import { FaRegFileLines, FaChevronRight } from "react-icons/fa6";
+import { useRealtimeModule } from "../../realtimeData";
 
 const moduleChipStyles = {
   Auth: "bg-[#EEF4FF] text-[#3538CD]",
@@ -47,39 +48,33 @@ export default function AuditLogPanel({ onViewAll }) {
   const [loading, setLoading] = useState(false);
   const { showNotification } = useNotification();
 
-  useEffect(() => {
-    let ignore = false;
-
-    const load = async () => {
-      try {
-        setLoading(true);
-        const { data } = await api.get("/audit", {
-          params: { page: 1, pageSize: 10 },
-          skipLoader: true,
-        });
-        if (ignore) return;
-        setLogs(data.data.logs);
-        setTotal(data.data.total);
-      } catch (err) {
-        console.error(err);
-        if (!ignore) {
-          showNotification({
-            type: "error",
-            title: "Failed to load activity log",
-            message: err.response?.data?.error || "Something went wrong",
-          });
-        }
-      } finally {
-        if (!ignore) setLoading(false);
-      }
-    };
-
-    load();
-
-    return () => {
-      ignore = true;
-    };
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data } = await api.get("/audit", {
+        params: { page: 1, pageSize: 10 },
+        skipLoader: true,
+      });
+      setLogs(data.data.logs);
+      setTotal(data.data.total);
+    } catch (err) {
+      console.error(err);
+      showNotification({
+        type: "error",
+        title: "Failed to load activity log",
+        message: err.response?.data?.error || "Something went wrong",
+      });
+    } finally {
+      setLoading(false);
+    }
   }, [showNotification]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // Every successful mutating request becomes an audit row — refresh live.
+  useRealtimeModule("*", load);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">

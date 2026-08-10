@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import ProjectBreadcrumb from './ProjectBreadcrumb'
 import ProjectSubTabs from './ProjectSubTabs'
 import ProjectOnboardingEmptyState from './ProjectOnboardingEmptyState'
@@ -9,7 +9,8 @@ import CalendarTab from './calender/CalendarTab'
 import ReportsTab from './reports/ReportsTab'
 import ProjectLifeCycle from '../lifecycle/ProjectLifeCycle'
 import AddProjectManager from '../AddProjectManager';
-import { getTasks } from '../../../api'
+import { api, getTasks } from '../../../api'
+import { useRealtimeModule } from '../../../realtimeData'
 
 function ProjectWorkspace({ 
     project, 
@@ -39,40 +40,73 @@ function ProjectWorkspace({
 
     const isHeadOfOps = user?.role === "HEADOFOPS";
 
-    useEffect(() => {
+    const loadTasks = useCallback(async () => {
+        try {
+            const response  = await getTasks(projectId, currentStageOrder);
 
-        const loadTasks = async () => {
-            try {
-                const response  = await getTasks(projectId, currentStageOrder);
+            let stageTasks = Array.isArray(response.data) ? response.data : [];
 
-                let stageTasks = Array.isArray(response.data) ? response.data : [];
+            if (isStaff) {
+                const resources = Array.isArray(project?.resources) ? project.resources : [];
+                const me = resources.find(
+                    (resource) =>
+                        (resource.email || "").toLowerCase() ===
+                        (user?.email || "").toLowerCase(),
+                );
 
-                if (isStaff) {
-                    const resources = Array.isArray(project?.resources) ? project.resources : [];
-                    const me = resources.find(
-                        (resource) =>
-                            (resource.email || "").toLowerCase() ===
-                            (user?.email || "").toLowerCase(),
-                    );
-
-                    stageTasks = me
-                        ? stageTasks.filter(
-                            (task) =>
-                                task.assignedResourceId === me.recordId ||
-                                task.assignee?.id === me.recordId
-                          )
-                        : [];
-                }
-
-                setTasks(stageTasks);
-
-            } catch (err) {
-                console.error(err);
+                stageTasks = me
+                    ? stageTasks.filter(
+                        (task) =>
+                            task.assignedResourceId === me.recordId ||
+                            task.assignee?.id === me.recordId
+                      )
+                    : [];
             }
-        };
 
-        loadTasks();
+            setTasks(stageTasks);
+
+        } catch (err) {
+            console.error(err);
+        }
     }, [projectId, currentStageOrder, isStaff, user?.email, project?.resources])
+
+    useEffect(() => {
+        loadTasks();
+    }, [loadTasks])
+
+    // Tasks changed elsewhere (another user created/updated/deleted one) — reload.
+    useRealtimeModule("Tasks", loadTasks);
+
+    // The project itself changed (stage submit/approve/reject, docs, checklist,
+    // assignment, resources). Refetch the freshest copy so every subtab — stage
+    // badges, overview, tasks tied to the current stage — stays in sync.
+    const refreshProject = useCallback(async (payload) => {
+        if (!projectId) return;
+        if (payload?.projectId && payload.projectId !== projectId) return;
+
+        try {
+            const { data } = await api.get(`/projects/${projectId}`);
+            const fresh = data?.data;
+            if (!fresh) return;
+
+            setProject(fresh);
+            setProjects((prev) =>
+                Array.isArray(prev)
+                    ? prev.map((p) =>
+                        (p.id === fresh.id || p.projectId === fresh.projectId)
+                            ? fresh
+                            : p,
+                      )
+                    : prev,
+            );
+            loadTasks();
+        } catch (err) {
+            console.error(err);
+        }
+    }, [projectId, setProject, setProjects, loadTasks]);
+
+    useRealtimeModule("Projects", refreshProject);
+    useRealtimeModule("Workflow", refreshProject);
 
     const isSetupComplete = (project?.resources?.length ?? 0) > 0
 

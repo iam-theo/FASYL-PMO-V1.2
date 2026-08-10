@@ -1,7 +1,8 @@
 import { FaEllipsisV, FaLock } from "react-icons/fa";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api } from "../../api";
 import AuditLogPanel from "./AuditLogPanel";
+import { useRealtimeModule } from "../../realtimeData";
 
 function ChevronIcon() {
   return (
@@ -302,24 +303,22 @@ function Dashboard({
   // Count of tasks assigned to the logged-in user. The backend resolves the
   // assignment by role: PM/HOPS via assignedToUserId, STAFF via the project
   // resources they are a member of.
-  useEffect(() => {
-    let ignore = false;
-
-    const loadTaskCount = async () => {
-      try {
-        const { data } = await api.get("/tasks/my-count");
-        if (!ignore) setTaskCount(data.data ?? 0);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-
-    loadTaskCount();
-
-    return () => {
-      ignore = true;
-    };
+  const loadTaskCount = useCallback(async () => {
+    try {
+      const { data } = await api.get("/tasks/my-count");
+      setTaskCount(data.data ?? 0);
+    } catch (err) {
+      console.error(err);
+    }
   }, []);
+
+  useEffect(() => {
+    loadTaskCount();
+  }, [loadTaskCount]);
+
+  // Tasks change live while the dashboard is open (created by the user or by a
+  // teammate) — keep the "My tasks" count fresh.
+  useRealtimeModule("Tasks", loadTaskCount);
 
   const filteredProjects = safeProjects.filter((project) => {
     if (user?.role === "HEADOFOPS") {

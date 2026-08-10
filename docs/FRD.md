@@ -199,8 +199,8 @@ The workspace presents sub-tabs: **Overview, Resources, Tasks, Calendar, Reports
 | ID | Priority | Requirement |
 |---|---|---|
 | FR-RT-01 | M | The frontend shall open a WebSocket connection authenticated with the user's JWT. |
-| FR-RT-02 | M | The server shall broadcast `projects:updated` events so that project lists and open workspaces refresh automatically without a manual reload. |
-| FR-RT-03 | M | The client shall automatically re-fetch project data on such events. |
+| FR-RT-02 | M | The server shall broadcast `data:changed` events (tagged with the affected module) so that project lists, open workspaces, audit trails and reminders refresh automatically without a manual reload. |
+| FR-RT-03 | M | The client shall automatically re-fetch data on such events. |
 
 ### 3.11 API Documentation
 

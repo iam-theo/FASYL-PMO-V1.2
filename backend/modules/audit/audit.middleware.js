@@ -1,4 +1,10 @@
-import { logAudit } from "./audit.service.js";
+import {
+  logAudit,
+  humanizeRequest,
+  extractProjectId,
+  stripApiPrefix,
+} from "./audit.service.js";
+import { broadcast } from "../realtime/realtime.service.js";
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -23,7 +29,25 @@ export const auditMiddleware = (req, res, next) => {
   res.on("finish", () => {
     // Only successful actions are worth an audit trail.
     if (res.statusCode < 200 || res.statusCode >= 400) return;
+
+    const { module, action } = humanizeRequest({
+      method: req.method,
+      path: req.originalUrl,
+      body: req.body,
+    });
+
     logAudit({ req });
+
+    // Push a generic data-changed event so every connected client can refresh
+    // the affected module. Auth churn (logins/signups) is skipped so a login
+    // never triggers a project-wide refetch.
+    if (module !== "Auth") {
+      broadcast("data:changed", {
+        module,
+        action,
+        projectId: extractProjectId(stripApiPrefix(req.originalUrl)),
+      });
+    }
   });
 
   next();

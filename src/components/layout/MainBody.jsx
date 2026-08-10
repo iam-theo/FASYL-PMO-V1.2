@@ -7,7 +7,8 @@ import { api } from "../../api";
 import SetupProjectModal from "../projects/tasks/SetupProjectModal";
 import TopBar from "./TopBar";
 import { REPORTS_BASE_PATH, resetReportsCache } from "../reports";
-import { startRealtime, stopRealtime, useRealtimeEvent } from "../../realtime";
+import { startRealtime, stopRealtime } from "../../realtime";
+import { useRealtimeModule } from "../../realtimeData";
 
 function MainBody({ user, setUser }) {
   const navigate = useNavigate();
@@ -99,7 +100,10 @@ function MainBody({ user, setUser }) {
     return () => stopRealtime();
   }, []);
 
-  useRealtimeEvent("projects:updated", loadProjects);
+  // Keep the project list live: any project or workflow-stage change anywhere
+  // (assignments, lifecycle mutations, docs, checklist, sales sync) reloads it.
+  useRealtimeModule("Projects", loadProjects);
+  useRealtimeModule("Workflow", loadProjects);
 
   useEffect(() => {
     loadProjects();

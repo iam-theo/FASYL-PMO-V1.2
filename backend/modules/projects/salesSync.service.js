@@ -83,7 +83,11 @@ export const syncProjects = async (projects) => {
     }
 
     if (projects.length > 0) {
-        broadcast("projects:updated", { count: projects.length });
+        broadcast("data:changed", {
+            module: "Projects",
+            action: "Synced projects from Sales API",
+            projectId: null,
+        });
     }
 }
 

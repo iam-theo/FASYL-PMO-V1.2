@@ -1,5 +1,6 @@
 import { getReminders } from "../../../../api"
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useRealtimeModule } from "../../../../realtimeData";
 
 function OverviewReminderSection({ onNavigate }) {
 
@@ -7,19 +8,22 @@ function OverviewReminderSection({ onNavigate }) {
 
     const isClickable = typeof onNavigate === "function";
 
-    useEffect(() => {
-        const loadReminders = async () => {
-            try {
-                const response = await getReminders();
-                setReminders(response.data);
-            } catch (err) {
-                console.error(err);
-            }
-        };
-
-        loadReminders();
-
+    const loadReminders = useCallback(async () => {
+        try {
+            const response = await getReminders();
+            setReminders(response.data);
+        } catch (err) {
+            console.error(err);
+        }
     }, []);
+
+    useEffect(() => {
+        loadReminders();
+    }, [loadReminders]);
+
+    // Reminders appear/disappear as they're created or dismissed — keep the
+    // section in sync with other users (and the scheduler).
+    useRealtimeModule("Reminders", loadReminders);
 
     return (
         <div

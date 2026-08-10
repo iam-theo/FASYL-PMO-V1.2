@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../api";
 import { useNotification } from "../NotificationContext";
+import { useRealtimeModule } from "../../realtimeData";
 import {
   FaRegFileLines,
   FaArrowLeft,
@@ -357,6 +358,10 @@ export default function AuditLogsPage() {
       })
       .catch((err) => console.error(err));
   };
+
+  // Live trail: every successful action anywhere appends an audit row, so this
+  // page refreshes (keeping its current page/filters) as actions happen.
+  useRealtimeModule("*", refresh);
 
   return (
     <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
