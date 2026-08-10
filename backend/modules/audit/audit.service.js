@@ -75,7 +75,7 @@ export const stripApiPrefix = (path) =>
   path.replace(/^\/api\/v\d+/, "").replace(/^\/api/, "");
 
 /** Safe path-based projectId extraction (string projectId, not numeric task id). */
-const extractProjectId = (cleanPath) => {
+export const extractProjectId = (cleanPath) => {
   const match =
     cleanPath.match(/^\/projects\/([^/]+)/) ||
     cleanPath.match(/^\/workflow\/(?:submit|approve|reject)\/([^/]+)/);
