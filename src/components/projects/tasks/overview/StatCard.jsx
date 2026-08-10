@@ -10,9 +10,26 @@ const CARD_BACKGROUND_STYLE = {
 }
 
 function StatCard({ value, label, icon, onSeeDetails }) {
+    const isClickable = typeof onSeeDetails === "function";
+
     return (
         <div
-            className='flex-1 min-w-52 h-35.75 p-3 rounded-lg border border-white flex flex-col justify-between'
+            onClick={isClickable ? onSeeDetails : undefined}
+            role={isClickable ? "button" : undefined}
+            tabIndex={isClickable ? 0 : undefined}
+            onKeyDown={
+                isClickable
+                    ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              onSeeDetails();
+                          }
+                      }
+                    : undefined
+            }
+            className={`flex-1 min-w-52 h-35.75 p-3 rounded-lg border border-white flex flex-col justify-between ${
+                isClickable ? "cursor-pointer hover:opacity-90 transition-opacity" : ""
+            }`}
             style={CARD_BACKGROUND_STYLE}
         >
             <div className='flex items-start justify-between gap-2'>
@@ -22,14 +39,10 @@ function StatCard({ value, label, icon, onSeeDetails }) {
                 </div>
                 {icon}
             </div>
-            <button
-                type="button"
-                onClick={onSeeDetails}
-                className='flex items-center justify-between gap-2 cursor-pointer'
-            >
+            <span className='flex items-center justify-between gap-2'>
                 <span className='font-medium text-[14px]/[20px] text-[#1B3C4A]'>See Details</span>
                 <ChevronRightIcon />
-            </button>
+            </span>
         </div>
     )
 }

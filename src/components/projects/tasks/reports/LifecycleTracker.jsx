@@ -1,5 +1,5 @@
 import { LifecycleCheckIcon } from "./icons";
-import { getSortedStages, computeLifecycleProgress } from "./analytics";
+import { getSortedStages, computeLifecycleProgress, isStageDone } from "./analytics";
 
 const truncate = (value, max = 12) => {
   const text = String(value ?? "").trim();
@@ -33,7 +33,7 @@ function LifecycleTracker({ project }) {
   const steps = stages.map((stage) => {
     const stageOrder = stage.stageOrder;
     let status = "pending";
-    if (stage.workflowStatus === "COMPLETED") status = "done";
+    if (isStageDone(stage)) status = "done";
     else if (stageOrder === currentStageOrder) status = "current";
 
     return {

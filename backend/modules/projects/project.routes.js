@@ -12,7 +12,8 @@ import {
    deleteProject,
    updateChecklistBulk,
    uploadStageDocument,
-   deleteStageDocument
+   deleteStageDocument,
+   addProjectResource
 } from "./project.controller.js";
 
 import { uploadLimiter, writeLimiter } from "../../middleware/rateLimit.middleware.js";
@@ -111,11 +112,133 @@ router.get(
 /* =========================================
    ASSIGN PROJECT
 ========================================= */
+/**
+ * @swagger
+ * /projects/{projectId}/assign:
+ *   patch:
+ *     summary: Assign a project manager to a project
+ *     tags:
+ *       - Projects
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: projectId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 69
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - projectManagerEmail
+ *             properties:
+ *               projectManagerEmail:
+ *                 type: string
+ *                 format: email
+ *                 example: pm1@fasyl.com
+ *     responses:
+ *       200:
+ *         description: Project assigned successfully
+ *       400:
+ *         description: projectManagerEmail is required
+ *       403:
+ *         description: Forbidden (HEADOFOPS only)
+ *       500:
+ *         description: Server error
+ */
 router.patch(
    "/:projectId/assign/",
    authMiddleWare,
    allowRoles(ROLES.HEADOFOPS),
    assignProject
+);
+
+/* =========================================
+   ADD RESOURCE TO PROJECT
+========================================= */
+/**
+ * @swagger
+ * /projects/{projectId}/resources:
+ *   patch:
+ *     summary: Add a resource to a project
+ *     description: Adds a resource (by manual entry) to the project's resources list. Duplicate email/staffId/recordId are rejected.
+ *     tags:
+ *       - Projects
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: projectId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 69
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - firstName
+ *               - lastName
+ *             properties:
+ *               firstName:
+ *                 type: string
+ *                 example: Nkechi
+ *               lastName:
+ *                 type: string
+ *                 example: Ijoma
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: nkechi.ijoma@fasylng.com
+ *               phoneNumber:
+ *                 type: string
+ *                 example: "09098983152"
+ *               staffId:
+ *                 type: string
+ *                 example: FNG23156
+ *               designation:
+ *                 type: string
+ *                 example: Business Analyst
+ *               recordId:
+ *                 type: string
+ *                 description: Optional; defaults to a generated MAN-<timestamp> value
+ *     responses:
+ *       200:
+ *         description: Resource added successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   $ref: "#/components/schemas/Project"
+ *       400:
+ *         description: Missing first/last name or duplicate resource
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden (Project Manager or HEADOFOPS only)
+ *       404:
+ *         description: Project not found
+ */
+router.patch(
+   "/:projectId/resources",
+   authMiddleWare,
+   writeLimiter,
+   allowRoles(ROLES.PROJECTMANAGER, ROLES.HEADOFOPS),
+   addProjectResource
 );
 
 /* =========================================
@@ -309,15 +432,53 @@ router.patch(
  *       403:
  *         description: Unauthorized
  */
-router.patch(
+   router.patch(
    "/:projectId/stages/:stageId/docs/:docKey",
    authMiddleWare,
    uploadLimiter,
    allowRoles(ROLES.PROJECTMANAGER),
    uploadStageDocumentFile,
    uploadStageDocument
- );
+  );
 
+/**
+ * @swagger
+ * /projects/{projectId}/stages/{stageId}/docs/{docKey}:
+ *   delete:
+ *     summary: Delete a stage document
+ *     tags:
+ *       - Projects
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: projectId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 69
+ *       - name: stageId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *       - name: docKey
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: nda_document
+ *     responses:
+ *       200:
+ *         description: Document deleted successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden (Project Manager only)
+ *       404:
+ *         description: Stage or document not found
+ */
 router.delete(
    "/:projectId/stages/:stageId/docs/:docKey",
    writeLimiter,
@@ -325,8 +486,6 @@ router.delete(
    allowRoles(ROLES.PROJECTMANAGER),
    deleteStageDocument
 );
-
-
 /* =========================================
    DELETE PROJECT
 ========================================= */

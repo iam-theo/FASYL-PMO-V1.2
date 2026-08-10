@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { CalendarIcon } from '../icons'
 import { WEEKDAYS, formatDateKey, getMonthMatrix, getMonthLabel } from '../calender/calendarUtils'
 
-function OverviewCalendarSection({ tasks = [] }) {
+function OverviewCalendarSection({ tasks = [], onNavigate }) {
     const currentDate = useMemo(() => new Date(), [])
 
     const cells = useMemo(
@@ -32,8 +32,25 @@ function OverviewCalendarSection({ tasks = [] }) {
 
     const todayKey = formatDateKey(new Date())
 
+    const isClickable = typeof onNavigate === "function";
+
     return (
-        <div className='flex flex-col gap-4'>
+        <div
+            onClick={isClickable ? onNavigate : undefined}
+            role={isClickable ? "button" : undefined}
+            tabIndex={isClickable ? 0 : undefined}
+            onKeyDown={
+                isClickable
+                    ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              onNavigate();
+                          }
+                      }
+                    : undefined
+            }
+            className={`flex flex-col gap-4 ${isClickable ? "cursor-pointer" : ""}`}
+        >
             <h3 className='font-semibold text-[16px]/[20px] text-[#090909]'>Calendar</h3>
 
             <div className='flex flex-col gap-2.5'>

@@ -1,4 +1,5 @@
 import StatCard from "./StatCard";
+import OverviewProjectDetails from "./OverviewProjectDetails";
 import OverviewCalendarSection from "./OverviewCalendarSection";
 import OverviewResourcesSection from "./OverviewResourcesSection";
 import OverviewReminderSection from "./OverviewReminderSection";
@@ -16,7 +17,9 @@ function OverviewTab({
   setTasks,
   onNavigateToTasks,
   onNavigateToResources,
+  onNavigateToCalendar,
   readOnly = false,
+  viewOnly = false,
 }) {
   const resources = project?.resources ?? [];
 
@@ -28,6 +31,8 @@ function OverviewTab({
 
   return (
     <div className="flex flex-col gap-6 px-4 py-4">
+      <OverviewProjectDetails project={project} />
+
       <div className="flex items-stretch gap-2 flex-wrap md:flex-nowrap">
         <StatCard
           value={totalTasks}
@@ -50,8 +55,8 @@ function OverviewTab({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <OverviewCalendarSection tasks={tasks} />
-        <OverviewReminderSection />
+        <OverviewCalendarSection tasks={tasks} onNavigate={onNavigateToCalendar} />
+        <OverviewReminderSection onNavigate={onNavigateToTasks} />
         {/* <OverviewResourcesSection resources={resources} /> */}
       </div>
 
@@ -62,9 +67,11 @@ function OverviewTab({
           tasks={tasks}
           setTasks={setTasks}
           onSeeAll={onNavigateToTasks}
+          onNavigate={onNavigateToTasks}
           readOnly={readOnly}
+          viewOnly={viewOnly}
         />
-        <OverviewResourcesSection resources={resources} />
+        <OverviewResourcesSection resources={resources} onNavigate={onNavigateToResources} />
       </div>
     </div>
   );

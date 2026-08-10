@@ -4,7 +4,8 @@ import {
   login,
   refresh,
   logout,
-  getProjectManagers
+  getProjectManagers,
+  signup,
 } from "./auth.controller.js";
 
 import {
@@ -103,6 +104,51 @@ router.post(
 
 /**
  * @swagger
+ * /auth/signup:
+ *   post:
+ *     summary: Create a Project Manager or Staff test account directly
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - fullName
+ *               - email
+ *               - password
+ *               - role
+ *             properties:
+ *               fullName:
+ *                 type: string
+ *                 example: Test Project Manager
+ *               email:
+ *                 type: string
+ *                 example: pm-test@example.com
+ *               password:
+ *                 type: string
+ *                 example: strongpassword123
+ *               role:
+ *                 type: string
+ *                 enum:
+ *                   - PROJECTMANAGER
+ *                   - STAFF
+ *     responses:
+ *       201:
+ *         description: Account created and signed in
+ *       400:
+ *         description: Validation error
+ */
+router.post(
+  "/signup",
+  registerLimiter,
+  authSlowDown,
+  signup
+);
+
+/**
+ * @swagger
  * /auth/refresh:
  *   post:
  *     summary: Refresh access token
@@ -135,6 +181,43 @@ router.post(
  */
 router.post("/logout", logout);
 
+/**
+ * @swagger
+ * /auth/project-managers:
+ *   get:
+ *     summary: Get all project managers
+ *     description: Returns all users with the PROJECTMANAGER role, used to populate assignment dropdowns.
+ *     tags: [Authentication]
+ *     responses:
+ *       200:
+ *         description: Project managers retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       fullName:
+ *                         type: string
+ *                       email:
+ *                         type: string
+ *                       role:
+ *                         type: string
+ *                         example: PROJECTMANAGER
+ *       500:
+ *         description: Server error
+ */
 router.get(
   "/project-managers",
   getProjectManagers

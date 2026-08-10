@@ -2,11 +2,13 @@ import { useMemo, useState } from 'react'
 import { ChevronDownIcon, CheckboxCheckIcon, MoreVerticalIcon, TrashIcon, PlusCircleIcon } from '../icons'
 import CreateTaskModal from './CreateTaskModal'
 import DeleteTaskModal from './DeleteTaskModal'
+import SubmitProofModal from './SubmitProofModal'
 import KanbanTab from '../kanban/KanbanTab'
 import {
     TASK_STATUS_OPTIONS,
     TASK_PRIORITY_OPTIONS,
     PRIORITY_BADGE_COLORS,
+    TASK_STATUS_LABELS,
 } from './taskConstants'
 import { DUE_DATE_FILTERS, matchesDueDateFilter } from './dueDateFilters'
 import { createTask, deleteTask, updateTask } from '../../../../api'
@@ -23,6 +25,7 @@ function TasksTab({
     project, 
     // setProject 
     readOnly = false,
+    viewOnly = false,
 }) {
 
     // console.log(project)
@@ -30,6 +33,8 @@ function TasksTab({
     //this is a comment
 
     const { showNotification } = useNotification();
+
+    const effectiveReadOnly = readOnly || viewOnly;
 
     const [view, setView] = useState('list')
     const [selectedIds, setSelectedIds] = useState([])
@@ -46,6 +51,7 @@ function TasksTab({
 
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [deleteTarget, setDeleteTarget] = useState(null) // { ids: [...] } | null
+    const [proofTarget, setProofTarget] = useState(null) // task awaiting proof upload
 
     const assigneeOptions = useMemo(() => {
         const members = [...resources, ...tasks.map(t => t.assignedTo)]
@@ -127,7 +133,29 @@ function TasksTab({
     };
 
 
+    const applyUpdatedTask = (updatedTask) => {
+        setTasks((prevTasks) =>
+            prevTasks
+                .map((task) =>
+                    task.id === updatedTask.id ? updatedTask : task
+                )
+                .sort(
+                    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+                )
+        );
+    };
+
+    const isStaffUser = loggedInUser?.role === "STAFF";
+
     const handleStatusChange = async (taskId, newStatus) => {
+
+        // Staff cannot mark a task done directly — they must attach proof of
+        // completion, which lands the task in PENDING_CONFIRMATION.
+        if (isStaffUser && (newStatus === "DONE" || newStatus === "PENDING_CONFIRMATION")) {
+            const task = tasks.find((t) => t.id === taskId);
+            if (task) setProofTarget(task);
+            return;
+        }
 
         try {
 
@@ -137,18 +165,40 @@ function TasksTab({
 
             console.log("updatedTask", updatedTask);
 
-            setTasks((prevTasks) =>
-                prevTasks
-                    .map((task) =>
-                        task.id === updatedTask.id ? updatedTask : task
-                    )
-                    .sort(
-                        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-                    )
-            );
+            applyUpdatedTask(updatedTask);
 
         } catch (err) {
             console.error(err);
+        }
+    };
+
+    const handleSubmitProof = async (task, file) => {
+        try {
+            const response = await updateTask(task.id, {
+                status: "PENDING_CONFIRMATION",
+                file,
+            });
+
+            const updatedTask = response.data;
+
+            applyUpdatedTask(updatedTask);
+
+            setProofTarget(null);
+
+            showNotification({
+                type: "success",
+                title: "Proof Submitted",
+                message: "Task submitted for project manager confirmation."
+            });
+
+        } catch (err) {
+            console.error(err);
+
+            showNotification({
+                type: "error",
+                title: "Submission Failed",
+                message: "Unable to submit proof of completion."
+            });
         }
     };
 
@@ -371,9 +421,9 @@ function TasksTab({
                     </div>
 
                     <div className='flex items-center gap-3'>
-                        {!readOnly && <ViewToggle view={view} onChange={setView} />}
+                        {!effectiveReadOnly && <ViewToggle view={view} onChange={setView} />}
 
-                        {!readOnly && (
+                        {!effectiveReadOnly && (
                             <button
                                 type="button"
                                 className='px-4 py-2.5 rounded-lg border border-[#0000000D] bg-[#E8E8E8] flex items-center gap-2 cursor-pointer'
@@ -383,7 +433,7 @@ function TasksTab({
                             </button>
                         )}
 
-                        {!readOnly && (
+                        {!effectiveReadOnly && (
                             <button
                                 type="button"
                                 onClick={() => setIsCreateModalOpen(true)}
@@ -419,7 +469,7 @@ function TasksTab({
                     />
                 </div>
 
-                {!readOnly && selectedIds.length > 0 && (
+                {!effectiveReadOnly && selectedIds.length > 0 && (
                     <div className='rounded-lg border border-[#0000000D] bg-[#FFFFFF80] p-4 flex items-center justify-between flex-wrap gap-3'>
                         <p className='font-medium text-[12px]/[18px] text-[#090909]'>{selectedIds.length} Selected</p>
                         <div className='flex items-center gap-3 flex-wrap'>
@@ -461,7 +511,7 @@ function TasksTab({
             </div>
 
             {
-                !readOnly && view === 'kanban' &&
+                !effectiveReadOnly && view === 'kanban' &&
                     (
                         <KanbanTab
                             tasks={tasks}
@@ -481,13 +531,13 @@ function TasksTab({
                     (
                         <div className='flex-1 min-h-0 w-full overflow-y-auto no-scrollbar px-4 py-4'>
                             {tasks.length === 0 ? (
-                                <TasksEmptyState readOnly={readOnly} onCreateTask={() => setIsCreateModalOpen(true)} />
+                                <TasksEmptyState readOnly={effectiveReadOnly} onCreateTask={() => setIsCreateModalOpen(true)} />
                             ) : (
                                 <div className='rounded-lg border border-[#0000000D] bg-[#F9FAFB] w-full overflow-x-auto'>
                                     <table className='border-collapse table-auto min-w-max'>
                                         <thead>
                                             <tr className='border-b border-[#0000000D]'>
-                                                {!readOnly && (
+                                                {!effectiveReadOnly && (
                                                     <th className='w-16 px-6 py-4 text-left'>
                                                         <TaskCheckbox checked={allOnPageSelected} onChange={toggleSelectAllOnPage} />
                                                     </th>
@@ -497,7 +547,7 @@ function TasksTab({
                                                 <th className='px-6 py-4 text-left font-medium text-[12px]/[18px] text-[#636363]'>Priority</th>
                                                 <th className='px-6 py-4 text-left font-medium text-[12px]/[18px] text-[#636363]'>Status</th>
                                                 <th className='px-6 py-4 text-left font-medium text-[12px]/[18px] text-[#636363]'>Due Date</th>
-                                                {!readOnly && (
+                                                {!effectiveReadOnly && (
                                                     <th className='px-6 py-4 text-right font-medium text-[12px]/[18px] text-[#636363]'>Actions</th>
                                                 )}
                                             </tr>
@@ -505,7 +555,7 @@ function TasksTab({
                                         <tbody>
                                             {paginatedTasks.length === 0 && (
                                                 <tr>
-                                                    <td colSpan={readOnly ? 6 : 7} className='px-6 py-10 text-center font-normal text-[14px]/[20px] text-[#636363]'>
+                                                    <td colSpan={effectiveReadOnly ? 6 : 7} className='px-6 py-10 text-center font-normal text-[14px]/[20px] text-[#636363]'>
                                                         No tasks match the selected filters.
                                                     </td>
                                                 </tr>
@@ -513,9 +563,9 @@ function TasksTab({
                                             {paginatedTasks.map((task) => (
                                                 <tr 
                                                     key={task.id} 
-                                                    onClick={readOnly ? undefined : () => handleEditTask(task)}
-                                                    className={`border-b border-[#0000000D] last:border-b-0 ${readOnly ? "" : "cursor-pointer"}`}>
-                                                    {!readOnly && (
+                                                    onClick={effectiveReadOnly ? undefined : () => handleEditTask(task)}
+                                                    className={`border-b border-[#0000000D] last:border-b-0 ${effectiveReadOnly ? "" : "cursor-pointer"}`}>
+                                                    {!effectiveReadOnly && (
                                                         <td className='px-6 py-4'>
                                                             <TaskCheckbox
                                                                 checked={selectedIds.includes(task.id)}
@@ -528,12 +578,30 @@ function TasksTab({
                                                     )}
                                                     <td className='px-6 py-4 font-medium text-[14px]/[20px] text-[#090909] whitespace-nowrap'>
                                                         {task.title}
+                                                        {task.documents?.length > 0 && (
+                                                            <div className='mt-1.5 flex flex-col gap-1'>
+                                                                {task.documents.map((doc, index) => (
+                                                                    <a
+                                                                        key={index}
+                                                                        href={doc.fileUrl}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                        title={doc.fileName}
+                                                                        className='inline-flex items-center gap-1.5 font-normal text-[12px]/[18px] text-[#1B3C4A] hover:underline'
+                                                                    >
+                                                                        <i className="fa-solid fa-paperclip"></i>
+                                                                        {doc.fileName}
+                                                                    </a>
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                     </td>
                                                     <td className='px-6 py-4 font-normal text-[14px]/[20px] text-[#636363] whitespace-nowrap'>
                                                         {task.assignee.fullName}
                                                     </td>
                                                     <td className='px-6 py-4'>
-                                                        {readOnly ? (
+                                                        {effectiveReadOnly ? (
                                                             <span
                                                                 className="inline-flex items-center rounded-2xl px-4 py-1.5 text-white font-normal text-[12px]/[24px]"
                                                                 style={{
@@ -578,6 +646,31 @@ function TasksTab({
                                                         )}
                                                     </td>
                                                     <td className='px-6 py-4'>
+                                                        {viewOnly ? (
+                                                            <span className='inline-flex items-center rounded-lg px-3.5 py-2.5 font-normal text-[12px]/[24px] text-[#667085] bg-[#F2F4F7]'>
+                                                                {TASK_STATUS_LABELS[task.status] ?? task.status}
+                                                            </span>
+                                                        ) : task.status === "PENDING_CONFIRMATION" && loggedInUser?.role === "PROJECTMANAGER" ? (
+                                                        <div
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className='flex items-center gap-2'
+                                                        >
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleStatusChange(task.id, "DONE")}
+                                                                className='rounded-lg bg-[#1B3C4A] px-3.5 py-2 font-medium text-[12px]/[24px] text-[#FFFFFF] cursor-pointer'
+                                                            >
+                                                                Confirm
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleStatusChange(task.id, "IN_PROGRESS")}
+                                                                className='rounded-lg border border-[#D0D5DD] bg-[#FFFFFF] px-3.5 py-2 font-medium text-[12px]/[24px] text-[#344054] cursor-pointer'
+                                                            >
+                                                                Send Back
+                                                            </button>
+                                                        </div>
+                                                        ) : (
                                                         <div 
                                                             onClick={(e) => e.stopPropagation()}
                                                             className='relative w-36.5 rounded-lg border border-[#D0D5DD] bg-[#FFFFFF] shadow-[0_1px_2px_0_rgba(16,24,40,0.05)]'>
@@ -592,17 +685,18 @@ function TasksTab({
                                                                     <option 
                                                                         key={index} 
                                                                         value={option}>
-                                                                        {option}
+                                                                        {TASK_STATUS_LABELS[option] ?? option}
                                                                     </option>
                                                                 ))}
                                                             </select>
                                                             <ChevronDownIcon className='pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2' />
                                                         </div>
+                                                        )}
                                                     </td>
                                                     <td className='px-6 py-4 font-normal text-[14px]/[20px] text-[#636363] whitespace-nowrap'>
                                                         {new Date(task.dueDate).toISOString().split("T")[0]}
                                                     </td>
-                                                    {!readOnly && (
+                                                    {!effectiveReadOnly && (
                                                     <td className='px-6 py-4 text-right relative'>
                                                         <button
                                                             type="button"
@@ -695,6 +789,14 @@ function TasksTab({
                     count={deleteTarget.ids.length}
                     onCancel={() => setDeleteTarget(null)}
                     onConfirm={handleConfirmDelete}
+                />
+            )}
+
+            {proofTarget && (
+                <SubmitProofModal
+                    task={proofTarget}
+                    onCancel={() => setProofTarget(null)}
+                    onSubmit={handleSubmitProof}
                 />
             )}
         </div>

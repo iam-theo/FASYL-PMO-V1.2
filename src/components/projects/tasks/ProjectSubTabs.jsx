@@ -1,11 +1,11 @@
 export const PROJECT_WORKSPACE_TABS = [
   { key: "overview", label: "Overview" },
+  { key: "project_lifecycle", label: "Project Lifecycle" },
   { key: "resources", label: "Resources" },
   { key: "tasks", label: "Tasks" },
   { key: "calendar", label: "Calendar" },
   // { key: "timeline", label: "Timeline" },
   { key: "reports", label: "Reports" },
-  { key: "project_lifecycle", label: "Project Lifecycle" },
 ];
 
 // Tasks (a task view) is visible to all roles; the calendar, reports and

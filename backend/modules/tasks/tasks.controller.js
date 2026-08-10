@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { createTaskService, deleteTaskService, getAssignedTaskCountService, getTaskService, updateTaskService } from "./tasks.service.js";
+import { storeUploadedFile } from "../../utils/upload.service.js";
 
 const prisma = new PrismaClient();
 
@@ -7,7 +8,17 @@ const prisma = new PrismaClient();
 export const createTask = async (req, res, next) => {
     try {
 
-        const task = await createTaskService(req.body, req.user);
+        const file = req.file;
+
+        const document = file
+            ? {
+                fileUrl: await storeUploadedFile(file),
+                fileName: file.originalname,
+                fileType: file.mimetype
+            }
+            : null;
+
+        const task = await createTaskService(req.body, req.user, document);
 
         return res.status(201).json({
             success: true,
@@ -17,6 +28,13 @@ export const createTask = async (req, res, next) => {
         
     } catch (error) {
         console.error("Create task error:", error);
+
+        if (error && error.name === "Error") {
+            return res.status(400).json({
+                success: false,
+                message: error.message
+            });
+        }
 
         res.status(500).json({
             success: false,
@@ -126,10 +144,26 @@ export const updateTask = async (req, res, next) => {
     try {
         const { id } = req.params;
 
+        const body = { ...req.body };
+
+        const file = req.file;
+
+        if (file) {
+            const document = {
+                fileUrl: await storeUploadedFile(file),
+                fileName: file.originalname,
+                fileType: file.mimetype,
+                purpose: "completion_proof",
+                uploadedBy: req.user?.id ?? null,
+                uploadedAt: new Date().toISOString()
+            };
+
+            body.documents = [document];
+        }
 
         const task = await updateTaskService(
             Number(id),
-            req.body,
+            body,
             req.user
         )
 
@@ -141,6 +175,13 @@ export const updateTask = async (req, res, next) => {
 
     } catch (error) {
         console.error("Update task error:", error);
+
+        if (error && error.name === "Error") {
+            return res.status(400).json({
+                success: false,
+                message: error.message
+            });
+        }
 
         res.status(500).json({
             success: false,

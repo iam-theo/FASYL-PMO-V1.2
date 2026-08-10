@@ -18,8 +18,6 @@ function MainSection({
     setIsSetupModalOpen,
     activeSubTab,
     setActiveSubTab,
-    activeDetails,
-    setActiveDetails
     }) {
 
     const [currentPage, setCurrentPage] = useState(1)
@@ -117,8 +115,6 @@ function MainSection({
                     setIsSetupModalOpen={setIsSetupModalOpen}
                     activeSubTab={activeSubTab}
                     setActiveSubTab={setActiveSubTab}
-                    activeDetails={activeDetails}
-                    setActiveDetails={setActiveDetails}
                     onNavigateToDashboard={() => {
                         setActiveTab("dashboard");
                         setOpenProject(false);

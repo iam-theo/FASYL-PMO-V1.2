@@ -17,6 +17,8 @@ export const createReminder = async (
   daysBefore = 1
 ) => {
 
+  if (!task.dueDate) return null;
+
   const remindAt = new Date(task.dueDate);
   remindAt.setDate(remindAt.getDate() - daysBefore);
 

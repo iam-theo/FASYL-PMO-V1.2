@@ -145,10 +145,17 @@ export const getSortedStages = (project) =>
     ? [...project.stages].sort((a, b) => (a.stageOrder ?? 0) - (b.stageOrder ?? 0))
     : [];
 
+// A stage is "done" once it is APPROVED; the final stage becomes COMPLETED.
+// Counting only COMPLETED would report 0% for every in-flight project.
+export const isStageDone = (stage) =>
+  stage?.workflowStatus === "APPROVED" || stage?.workflowStatus === "COMPLETED";
+
 export const computeLifecycleProgress = (project) => {
   const stages = Array.isArray(project?.stages) ? project.stages : [];
-  const completedCount = stages.filter((stage) => stage.workflowStatus === "COMPLETED").length;
-  if (stages.length > 0) return Math.round((completedCount / stages.length) * 100);
+  if (stages.length > 0) {
+    const doneCount = stages.filter(isStageDone).length;
+    return Math.round((doneCount / stages.length) * 100);
+  }
   return Math.round(Number(project?.progressPercent) || 0);
 };
 
@@ -174,9 +181,11 @@ const TASK_STATUS_LABELS = {
   TODO: "To Do",
   IN_PROGRESS: "In Progress",
   IN_REVIEW: "In Review",
+  BLOCKED: "Blocked",
+  PENDING_CONFIRMATION: "Pending Confirmation",
   DONE: "Done",
   COMPLETED: "Completed",
-  BLOCKED: "Blocked",
+  CANCELLED: "Cancelled",
 };
 
 export const formatTaskStatus = (status) => TASK_STATUS_LABELS[status] ?? (status ?? "");

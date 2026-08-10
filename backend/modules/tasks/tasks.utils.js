@@ -47,6 +47,7 @@ export const formatTask = (task) => {
         completedAt: task.completedAt,
         createdAt: task.createdAt,
         updatedAt: task.updatedAt,
+        documents: Array.isArray(task.documents) ? task.documents : [],
         assignedToUserId: task.assignedToUserId ?? null,
         assignedResourceId: task.assignedResourceId ?? null,
 

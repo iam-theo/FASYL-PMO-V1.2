@@ -40,6 +40,23 @@ function KanbanTaskCard({
                         <span className='font-normal text-[14px]/[20px] text-[#636363]'>Due Date</span>
                         <span className='font-normal text-[14px]/[20px] text-[#636363] text-right'>{formatDueDate(task.dueDate)}</span>
                     </div>
+                    {task.documents?.length > 0 && (
+                        <div className='flex flex-col gap-1.5'>
+                            {task.documents.map((doc, index) => (
+                                <a
+                                    key={index}
+                                    href={doc.fileUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    title={doc.fileName}
+                                    className='inline-flex items-center gap-1.5 font-normal text-[14px]/[20px] text-[#1B3C4A] hover:underline'
+                                >
+                                    <i className="fa-solid fa-paperclip"></i>
+                                    <span className='truncate'>{doc.fileName}</span>
+                                </a>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
 

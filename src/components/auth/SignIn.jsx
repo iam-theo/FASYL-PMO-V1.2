@@ -4,15 +4,33 @@ import bgSignInTwo from "../../assets/bgSignInTwo.jpg"
 import { useState } from 'react'
 import { api } from '../../api'
 import { useNotification } from '../NotificationContext'
+import SignUp from './SignUp'
 
 function SignIn({ setUser }) {
 
     const [email, setEmail] = useState(null)
     const [password, setPassword] = useState(null)
+    const [showSignUp, setShowSignUp] = useState(false)
     const { showNotification } = useNotification()
     const [loading, setLoading] = useState(false);
 
     const navigate = useNavigate()
+
+    const fillTestCredentials = () => {
+        setEmail("coo@fasylng.com");
+        setPassword("123456");
+        showNotification({
+            type: "success",
+            title: "Head of Operations",
+            message: "Test credentials filled in. Click Sign in to continue."
+        });
+    }
+
+    const handleSignUpComplete = (user) => {
+        setShowSignUp(false);
+        setUser(user);
+        navigate("/app");
+    }
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -133,6 +151,7 @@ function SignIn({ setUser }) {
 
                             <input 
                                 onChange={(e) => setEmail(e.target.value)}
+                                value={email ?? ""}
                                 type="email" 
                                 name='email' 
                                 placeholder='Enter your email' 
@@ -152,6 +171,7 @@ function SignIn({ setUser }) {
 
                             <input 
                                 onChange={(e) => setPassword(e.target.value)}
+                                value={password ?? ""}
                                 type="password" 
                                 name='password' 
                                 placeholder='........' 
@@ -173,13 +193,46 @@ function SignIn({ setUser }) {
                                 {!loading ? "Sign in" : "Signing in..."}
                         </button>
 
-                    </form>
+                        </form>
+
+                        <div className='w-90 flex flex-col gap-2 pt-4'>
+                            <button
+                                type="button"
+                                onClick={fillTestCredentials}
+                                className='w-full h-11 rounded-lg border border-dashed border-[#1B3C4A] bg-[#F3F7F9] flex items-center justify-center gap-2 cursor-pointer'
+                            >
+                                <i className="fa-solid fa-user-pen text-[#1B3C4A]"></i>
+                                <span className='font-medium text-[14px]/[20px] text-[#1B3C4A]'>Head of Operations (one-click login)</span>
+                            </button>
+
+                            <div className='flex items-center gap-3'>
+                                <div className='flex-1 h-px bg-[#D0D5DD]'></div>
+                                <span className='font-normal text-[12px]/[20px] text-[#667085]'>or</span>
+                                <div className='flex-1 h-px bg-[#D0D5DD]'></div>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setShowSignUp(true)}
+                                className='w-full h-11 rounded-lg border border-[#D0D5DD] bg-[#FFFFFF] flex items-center justify-center gap-2 cursor-pointer'
+                            >
+                                <i className="fa-solid fa-user-plus text-[#1B3C4A]"></i>
+                                <span className='font-medium text-[14px]/[20px] text-[#1B3C4A]'>Create a Project Manager / Staff test account</span>
+                            </button>
+                        </div>
+
+                    </div>
 
                 </div>
 
-            </div>
+            {showSignUp && (
+                <SignUp
+                    onClose={() => setShowSignUp(false)}
+                    onSignUpComplete={handleSignUpComplete}
+                />
+            )}
 
-        </div>
+            </div>
     )
 }
 

@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { processFile, getFileFromInput, handleDragOver, handleDragLeave,  getFileFromDrop } from './utils/UploadFiles'
 import { uploadStageDocument, deleteStageDocument } from '../../../api'
+import { MAX_UPLOAD_MB } from '../../../constants/uploads'
 
 function UploadBox({
-    maxSizeMB = 5,
+    maxSizeMB = MAX_UPLOAD_MB,
     formats = "SVG, JPG, PDF",
     title,
     docKey,
@@ -338,7 +339,7 @@ function UploadBox({
                                     </span> 
                                     or drag and drop
                                 </p>
-                                <p className='font-normal text-[14px]/[20px] text-[#636363]'>{formats} (max. 5mb/4000x4000px)</p>
+                                <p className='font-normal text-[14px]/[20px] text-[#636363]'>{formats} (max. {MAX_UPLOAD_MB}mb/4000x4000px)</p>
 
                                 {/* Error */}
                                 {uploadState[docKey]?.error && (

@@ -3,7 +3,8 @@ import {
   loginUser,
   refreshTokenService,
   logoutUser,
-  getProjectManagersService
+  getProjectManagersService,
+  signupUser,
 } from "./auth.service.js";
 
 /* =========================
@@ -19,6 +20,30 @@ export const register = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+};
+
+/* =========================
+   SIGNUP (TEST ACCOUNTS)
+========================= */
+export const signup = async (req, res) => {
+  try {
+    const { user, accessToken, refreshToken } = await signupUser(req.body);
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: false, // true in production (HTTPS)
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    res.status(201).json({
+      message: "Account created successfully",
+      user,
+      accessToken,
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 };
 

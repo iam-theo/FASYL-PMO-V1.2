@@ -113,6 +113,16 @@ export const assignProject = async (projectId, projectManagerEmail) => {
   }
 };
 
+export const addProjectResource = async (projectId, resource) => {
+  try {
+    const { data } = await api.patch(`/projects/${projectId}/resources`, resource);
+
+    return data;
+  } catch (error) {
+    return normalizeError(error, "Add Resource Error");
+  }
+};
+
 export const handleChecklist = async (projectId, stageId, updatedChecklist) => {
   try {
     const { data } = await api.patch(
@@ -195,7 +205,27 @@ export const rejectStage = async (projectId, stageOrder, reason) => {
 
 export const createTask = async (payload) => {
   try {
-    const { data } = await api.post("/tasks", payload);
+    const { document, ...taskFields } = payload;
+
+    // When a document is attached the payload must be multipart/form-data so
+    // multer can pick the file up. The interceptor deletes the Content-Type
+    // header for FormData automatically.
+    let request = payload;
+
+    if (document instanceof File) {
+      const formData = new FormData();
+
+      Object.entries(taskFields).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          formData.append(key, value);
+        }
+      });
+
+      formData.append("file", document);
+      request = formData;
+    }
+
+    const { data } = await api.post("/tasks", request);
 
     return data;
   } catch (error) {
@@ -217,7 +247,27 @@ export const getTasks = async (projectId, stageOrder) => {
 
 export const updateTask = async (taskId, payload) => {
   try {
-    const { data } = await api.patch(`/tasks/${taskId}`, payload);
+    let request = payload;
+
+    // When the payload carries a file (e.g. proof of completion) it must be
+    // multipart/form-data so multer can pick it up.
+    const hasFile = Object.values(payload).some(
+      (value) => value instanceof File,
+    );
+
+    if (hasFile) {
+      const formData = new FormData();
+
+      Object.entries(payload).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          formData.append(key, value);
+        }
+      });
+
+      request = formData;
+    }
+
+    const { data } = await api.patch(`/tasks/${taskId}`, request);
 
     return data;
   } catch (error) {

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 // import { AiTwotonePlusCircle } from "react-icons/ai"
 import ResourceCard from "./ResourceCard";
 import ExportMenu from "../ExportMenu";
-// import AddResourceModal from './AddResourceModal'
+import AddResourceModal from "./AddResourceModal";
 // import RemoveResourceModal from './RemoveResourceModal'
 
 const ITEMS_PER_PAGE = 6;
@@ -15,22 +15,25 @@ const resourceExportColumns = [
   { label: "Email", value: (resource) => resource.email },
 ];
 
-function ResourcesTab({ project }) {
+function ResourcesTab({ project, onProjectUpdate, canManageResources = false }) {
   // console.log(project)
 
-  // const [resources, setResources] = useState(project)
   const [currentPage, setCurrentPage] = useState(1);
-  // const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   // const [resourceToRemove, setResourceToRemove] = useState(null)
 
-  const resources = project?.resources;
+  const resources = useMemo(() => project?.resources || [], [project?.resources]);
 
-  const totalPages = Math.max(1, Math.ceil(resources?.length / ITEMS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(resources.length / ITEMS_PER_PAGE));
 
   const paginatedResources = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
     return resources.slice(start, start + ITEMS_PER_PAGE);
   }, [resources, currentPage]);
+
+  const handleResourceAdded = (updatedProject) => {
+    onProjectUpdate?.(updatedProject);
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -50,17 +53,19 @@ function ResourcesTab({ project }) {
               filename={`resources-${project?.projectId ?? "export"}`}
               title={`${project?.projectName ?? "Project"} - Resources`}
               columns={resourceExportColumns}
-              rows={resources ?? []}
+              rows={resources}
             />
 
-            {/* <button
-                            type="button"
-                            onClick={() => setIsAddModalOpen(true)}
-                            className='px-4 py-2.5 rounded-lg border border-[#0000000D] bg-[#1B3C4A] flex items-center gap-2 cursor-pointer'
-                        >
-                            <AiTwotonePlusCircle size={18} className='text-[#FFFFFF]' />
-                            <span className='font-medium text-[14px]/[20px] text-[#FFFFFF]'>Add New Resource</span>
-                        </button> */}
+            {canManageResources && (
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(true)}
+                className='px-4 py-2.5 rounded-lg border border-[#0000000D] bg-[#1B3C4A] flex items-center gap-2 cursor-pointer'
+              >
+                <i className="fa-solid fa-plus text-[#FFFFFF]"></i>
+                <span className='font-medium text-[14px]/[20px] text-[#FFFFFF]'>Add Resource</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -69,6 +74,7 @@ function ResourcesTab({ project }) {
         {resources.length === 0 ? (
           <div className="w-full py-20 text-center font-normal text-[14px]/[20px] text-[#636363]">
             No resources assigned to this project yet.
+            {canManageResources && " Use the Add Resource button to add one."}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -107,21 +113,23 @@ function ResourcesTab({ project }) {
         </div>
       </div>
 
-      {/* {isAddModalOpen && (
-                <AddResourceModal
-                    availableResources={availableToAdd}
-                    onClose={() => setIsAddModalOpen(false)}
-                    onConfirm={handleAddResources}
-                />
-            )}
-
-            {resourceToRemove && (
+      {/* {resourceToRemove && (
                 <RemoveResourceModal
                     resource={resourceToRemove}
                     onCancel={() => setResourceToRemove(null)}
                     onConfirm={handleRemoveResource}
                 />
             )} */}
+
+            {isAddModalOpen && (
+                <AddResourceModal
+                    projectId={project.id}
+                    projectCode={project.projectId}
+                    projectName={project.projectName}
+                    onClose={() => setIsAddModalOpen(false)}
+                    onAdded={handleResourceAdded}
+                />
+            )}
     </div>
   );
 }

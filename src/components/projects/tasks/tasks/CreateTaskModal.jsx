@@ -1,6 +1,9 @@
-import { useState } from 'react'
-import { CloseIcon, CheckCircleIcon, ChevronDownIcon, CalendarIcon } from '../icons/index'
+import { useRef, useState } from 'react'
+import { CloseIcon, CheckCircleIcon, ChevronDownIcon, CalendarIcon, TrashIcon } from '../icons/index'
 import { TASK_PRIORITY_OPTIONS } from './taskConstants'
+import { MAX_UPLOAD_MB, MAX_FILE_SIZE } from '../../../../constants/uploads'
+
+const ALLOWED_FILE_TYPES = ["image/svg+xml", "image/jpeg", "application/pdf"];
 
 function CreateTaskModal({ 
     onClose, 
@@ -41,6 +44,37 @@ function CreateTaskModal({
     };
 
     const [form, setForm] = useState(initialForm);
+
+    const fileInputRef = useRef(null);
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [fileError, setFileError] = useState("");
+
+    const handleFileChange = (e) => {
+        const file = e.target.files?.[0];
+        e.target.value = "";
+
+        if (!file) return;
+
+        if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+            setFileError("Invalid file type. Only SVG, JPG, or PDF allowed");
+            setSelectedFile(null);
+            return;
+        }
+
+        if (file.size > MAX_FILE_SIZE) {
+            setFileError(`File is too large. Maximum allowed size is ${MAX_UPLOAD_MB}MB`);
+            setSelectedFile(null);
+            return;
+        }
+
+        setFileError("");
+        setSelectedFile(file);
+    };
+
+    const handleDropFile = (e) => {
+        e.preventDefault();
+        handleFileChange({ target: { files: e.dataTransfer.files, value: "" } });
+    };
 
     // useEffect(() => {
     //     if (!isEditing) return;
@@ -93,7 +127,8 @@ function CreateTaskModal({
             description: form.description,
             startDate: form.startDate,
             dueDate: form.dueDate,
-            priority: form.priority.toUpperCase()
+            priority: form.priority.toUpperCase(),
+            document: selectedFile
         };
 
         if (userRole === "HEADOFOPS") {
@@ -217,6 +252,55 @@ function CreateTaskModal({
                             className='resize-none rounded-lg border border-[#D0D5DD] bg-[#FFFFFF] shadow-[0_1px_2px_0_rgba(16,24,40,0.05)] px-3.5 py-2.5 outline-none font-normal text-[16px]/[24px] text-[#090909] placeholder:text-[#667085]'
                         />
                     </div>
+
+                    {!isEditing && (
+                        <div className='flex flex-col gap-1.5'>
+                            <label className='font-medium text-[14px]/[20px] text-[#090909]'>Attach Document</label>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                className='hidden'
+                                accept="image/svg+xml,image/jpeg,application/pdf"
+                                onChange={handleFileChange}
+                            />
+
+                            {selectedFile ? (
+                                <div className='rounded-lg border border-[#D0D5DD] bg-[#FFFFFF] shadow-[0_1px_2px_0_rgba(16,24,40,0.05)] px-3.5 py-2.5 flex items-center justify-between gap-2'>
+                                    <div className='flex items-center gap-2 min-w-0'>
+                                        <i className="fa-solid fa-paperclip text-[#1B3C4A]"></i>
+                                        <span className='font-normal text-[16px]/[24px] text-[#090909] truncate'>{selectedFile.name}</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedFile(null);
+                                            setFileError("");
+                                        }}
+                                        aria-label="Remove document"
+                                        className='shrink-0 cursor-pointer'
+                                    >
+                                        <TrashIcon />
+                                    </button>
+                                </div>
+                            ) : (
+                                <div
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={handleDropFile}
+                                    className='w-full min-h-27.5 rounded-lg border border-dashed border-[#E4E7EC] bg-[#FFFFFF] flex flex-col items-center justify-center gap-1 cursor-pointer p-4'
+                                    onClick={() => fileInputRef.current?.click()}
+                                >
+                                    <i className="fa-solid fa-circle-arrow-up text-[#1B3C4A] mt-3"></i>
+                                    <p className='font-normal text-[14px]/[20px] text-[#636363]'>
+                                        <span className='text-[#1B3C4A] font-medium'>Click to upload</span> or drag and drop
+                                    </p>
+                                    <p className='font-normal text-[14px]/[20px] text-[#636363]'>SVG, JPG, or PDF (max. {MAX_UPLOAD_MB}MB)</p>
+                                    {fileError && (
+                                        <p className='text-[14px]/[20px] text-[#D20019] font-normal'>{fileError}</p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     <div className='flex flex-col gap-1.5'>
                         <label className='font-medium text-[14px]/[20px] text-[#090909]'>Start Date</label>

@@ -7,7 +7,7 @@ import { getMonthLabel } from "./calendarUtils";
 import ExportMenu from "../ExportMenu";
 import { taskExportColumns } from "../exportConfig";
 
-function CalendarTab({ tasks, setTasks }) {
+function CalendarTab({ tasks, setTasks, viewOnly = false }) {
   const [currentDate, setCurrentDate] = useState(() => new Date());
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
@@ -49,16 +49,18 @@ function CalendarTab({ tasks, setTasks }) {
               rows={tasks}
             />
 
-            <button
-              type="button"
-              onClick={() => setIsCreateModalOpen(true)}
-              className="px-4 py-2.5 rounded-lg border border-[#0000000D] bg-[#1B3C4A] flex items-center gap-2 cursor-pointer"
-            >
-              <PlusCircleIcon />
-              <span className="font-medium text-[14px]/[20px] text-[#FFFFFF]">
-                New Task
-              </span>
-            </button>
+            {!viewOnly && (
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(true)}
+                className="px-4 py-2.5 rounded-lg border border-[#0000000D] bg-[#1B3C4A] flex items-center gap-2 cursor-pointer"
+              >
+                <PlusCircleIcon />
+                <span className="font-medium text-[14px]/[20px] text-[#FFFFFF]">
+                  New Task
+                </span>
+              </button>
+            )}
           </div>
         </div>
       </div>

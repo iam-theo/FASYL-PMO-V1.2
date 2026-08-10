@@ -1,5 +1,8 @@
 generator client {
   provider = "prisma-client-js"
+  // "native" covers local dev / VPS; rhel-openssl-3.0.x matches Vercel's
+  // Amazon Linux 2023 function runtime so the engine binary exists in prod.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -212,6 +215,7 @@ model Task {
   projectId          Int
   assignedResourceId String?
   assignedToUserId   Int?
+  documents          Json?
   reminders          Reminder[]
   assignedBy         User          @relation("TaskAssigner", fields: [assignedById], references: [id])
   assignedToUser     User?         @relation("TaskAssignee", fields: [assignedToUserId], references: [id])
@@ -343,6 +347,7 @@ enum TaskStatus {
   IN_PROGRESS
   IN_REVIEW
   BLOCKED
+  PENDING_CONFIRMATION
   DONE
   CANCELLED
 }

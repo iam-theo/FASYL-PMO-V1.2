@@ -56,8 +56,6 @@ function MainBody({ user, setUser }) {
     });
   };
 
-  // const isSetupComplete = (selectedProject?.resources?.length ?? 0) > 0
-  const [activeDetails, setActiveDetails] = useState("project_lifecycle");
   const [selectedProject, setSelectedProject] = useState(null);
 
   const [projects, setProjects] = useState([]);
@@ -195,8 +193,6 @@ function MainBody({ user, setUser }) {
             setSelectedProject={setSelectedProject}
             user={user}
             isLoading={isLoading}
-            activeDetails={activeDetails}
-            setActiveDetails={setActiveDetails}
           />
         )}
       </div>

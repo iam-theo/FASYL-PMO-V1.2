@@ -1,10 +1,26 @@
 const PREVIEW_COUNT = 5
 
-function OverviewResourcesSection({ resources = [] }) {
+function OverviewResourcesSection({ resources = [], onNavigate }) {
     const previewResources = resources.slice(0, PREVIEW_COUNT)
+    const isClickable = typeof onNavigate === "function";
 
     return (
-        <div className='flex flex-col gap-4'>
+        <div
+            onClick={isClickable ? onNavigate : undefined}
+            role={isClickable ? "button" : undefined}
+            tabIndex={isClickable ? 0 : undefined}
+            onKeyDown={
+                isClickable
+                    ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              onNavigate();
+                          }
+                      }
+                    : undefined
+            }
+            className={`flex flex-col gap-4 ${isClickable ? "cursor-pointer" : ""}`}
+        >
             <h3 className='font-semibold text-[16px]/[20px] text-[#090909]'>Resources On This Project</h3>
 
             <div className='rounded-lg border border-[#0000000D] bg-[#FFFFFF] overflow-x-auto'>

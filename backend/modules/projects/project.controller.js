@@ -7,8 +7,10 @@ import {
   updateChecklistBulkService,
   uploadStageDocumentService,
   deleteStageDocumentService,
+  addResourceToProjectService,
 } from "./project.service.js";
 import { notifyProjectAssignment } from "../notifications/notification.service.js";
+import { storeUploadedFile } from "../../utils/upload.service.js";
 
 /* =========================================
     CREATE PROJECT
@@ -89,10 +91,12 @@ export const assignProject = async (req, res) => {
     );
 
     if (project?.projectManager?.email) {
-      await notifyProjectAssignment({
+      notifyProjectAssignment({
         project,
         projectManager: project.projectManager,
         assignedBy: req.user,
+      }).catch((error) => {
+        console.error("Project assignment notification failed:", error.message);
       });
     }
 
@@ -105,6 +109,29 @@ export const assignProject = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to assign project",
+      error: err.message,
+    });
+  }
+};
+
+/* =========================================
+    ADD RESOURCE TO PROJECT
+========================================= */
+export const addProjectResource = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    const project = await addResourceToProjectService(projectId, req.body);
+
+    return res.status(200).json({
+      success: true,
+      message: "Resource added successfully",
+      data: project,
+    });
+  } catch (err) {
+    return res.status(400).json({
+      success: false,
+      message: "Failed to add resource",
       error: err.message,
     });
   }
@@ -188,8 +215,7 @@ export const uploadStageDocument = async (req, res) => {
       });
     }
 
-    const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "http://localhost:5000";
-    const fileUrl = `${PUBLIC_BASE_URL.replace(/\/+$/, "")}/uploads/${file.filename}`;
+    const fileUrl = await storeUploadedFile(file);
 
     const filename = `${file.originalname}`;
 

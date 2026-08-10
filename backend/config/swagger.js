@@ -70,6 +70,121 @@ const options = {
       },
 
       schemas: {
+        Project: {
+          type: "object",
+
+          properties: {
+            id: {
+              type: "integer",
+              example: 11780,
+            },
+
+            projectId: {
+              type: "string",
+              example: "PROJ-731443",
+            },
+
+            projectName: {
+              type: "string",
+              example: "Flexcube Migration",
+            },
+
+            clientName: {
+              type: "string",
+              example: "Premium Trust Bank",
+            },
+
+            productName: {
+              type: "string",
+              nullable: true,
+            },
+
+            description: {
+              type: "string",
+              nullable: true,
+            },
+
+            status: {
+              type: "string",
+              example: "ACTIVE",
+            },
+
+            workflowStatus: {
+              type: "string",
+              enum: [
+                "UNASSIGNED",
+                "LOCKED",
+                "OPEN",
+                "SUBMITTED",
+                "APPROVED",
+                "REJECTED",
+                "COMPLETED",
+              ],
+            },
+
+            progressPercent: {
+              type: "number",
+              example: 0,
+            },
+
+            currentStageOrder: {
+              type: "integer",
+              example: 0,
+            },
+
+            projectManagerId: {
+              type: "integer",
+              nullable: true,
+            },
+
+            source: {
+              type: "string",
+              example: "SALES",
+            },
+
+            resources: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  recordId: {
+                    type: "string",
+                    example: "EMP-419102",
+                  },
+                  firstName: {
+                    type: "string",
+                  },
+                  lastName: {
+                    type: "string",
+                  },
+                  email: {
+                    type: "string",
+                  },
+                  staffId: {
+                    type: "string",
+                  },
+                  phoneNumber: {
+                    type: "string",
+                  },
+                  designation: {
+                    type: "string",
+                  },
+                },
+              },
+            },
+
+            createdAt: {
+              type: "string",
+              format: "date-time",
+            },
+
+            updatedAt: {
+              type: "string",
+              format: "date-time",
+            },
+          },
+        },
+
         Report: {
           type: "object",
 
@@ -278,7 +393,7 @@ const options = {
     ],
   },
 
-  apis: ["./backend/modules/**/*.js"],
+  apis: ["./backend/modules/**/*.js", "./backend/server.js"],
 };
 
 const swaggerSpec = swaggerJsdoc(options);

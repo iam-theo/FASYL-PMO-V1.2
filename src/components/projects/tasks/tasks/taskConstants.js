@@ -1,5 +1,15 @@
-export const TASK_STATUS_OPTIONS = ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"]
+export const TASK_STATUS_OPTIONS = ["TODO", "IN_PROGRESS", "IN_REVIEW", "BLOCKED", "PENDING_CONFIRMATION", "DONE"]
 export const TASK_PRIORITY_OPTIONS = ["URGENT", "HIGH", "MEDIUM", "LOW"]
+
+export const TASK_STATUS_LABELS = {
+    TODO: "To Do",
+    IN_PROGRESS: "In Progress",
+    IN_REVIEW: "In Review",
+    BLOCKED: "Blocked",
+    PENDING_CONFIRMATION: "Pending Confirmation",
+    DONE: "Done",
+    CANCELLED: "Cancelled",
+}
 
 // export const TASK_ASSIGNEES = [
 //     "Olusoga Eniola",

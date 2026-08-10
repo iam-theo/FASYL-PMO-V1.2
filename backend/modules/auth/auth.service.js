@@ -4,6 +4,67 @@ import { signAccessToken, signRefreshToken } from "../../utils/jwt.js";
 
 const prisma = new PrismaClient();
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/* =========================
+   SIGNUP (TEST ACCOUNTS)
+========================= */
+export const signupUser = async ({ fullName, email, password, role }) => {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const normalizedRole = String(role || "").toUpperCase();
+
+  if (!fullName || !normalizedEmail || !password) {
+    throw new Error("Full name, email and password are required");
+  }
+
+  if (!EMAIL_REGEX.test(normalizedEmail)) {
+    throw new Error("Please enter a valid email address");
+  }
+
+  if (
+    normalizedRole !== Role.PROJECTMANAGER &&
+    normalizedRole !== Role.STAFF
+  ) {
+    throw new Error(
+      "Signup is only available for Project Manager and Staff test accounts",
+    );
+  }
+
+  const existing = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+  });
+
+  if (existing) {
+    throw new Error("An account with this email already exists");
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  const user = await prisma.user.create({
+    data: {
+      fullName: String(fullName).trim(),
+      email: normalizedEmail,
+      password: passwordHash,
+      role: Role[normalizedRole],
+    },
+  });
+
+  const accessToken = signAccessToken(user);
+  const refreshToken = signRefreshToken(user);
+
+  await prisma.refreshToken.create({
+    data: {
+      token: refreshToken,
+      userId: user.id,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    },
+  });
+
+  const { password: _, ...safeUser } = user;
+
+  return { user: safeUser, accessToken, refreshToken };
+};
+
 /* =========================
    REGISTER
 ========================= */

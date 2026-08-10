@@ -270,35 +270,55 @@ export const assignProjectService = async (projectId, pmEmail) => {
     throw new Error("User is not a Project Manager");
   }
 
+  const existing = await prisma.project.findUnique({
+    where: { id: projectId },
+  });
+
+  if (!existing) {
+    throw new Error("Project not found");
+  }
+
+  // Only bootstrap the workflow for brand-new (never-assigned) projects.
+  // Reassignments keep the current stage so the project resumes exactly
+  // where it left off instead of restarting at stage 1.
+  const isNewWorkflow =
+    existing.workflowStatus === WorkflowStatus.UNASSIGNED ||
+    existing.currentStageOrder === 0;
+
   const project = await prisma.project.update({
     where: { id: projectId },
     data: {
-      projectManagerId: user.id,  
-
-      currentStageOrder: 1,
-      workflowStatus: WorkflowStatus.OPEN,
+      projectManagerId: user.id,
+      ...(isNewWorkflow
+        ? {
+            currentStageOrder: 1,
+            workflowStatus: WorkflowStatus.OPEN,
+          }
+        : {}),
     },
   });
 
-  await prisma.projectStage.updateMany({
-    where: {
-      projectId: project.projectId,
-      stageOrder: 1,
-    },
-    data: {
-      workflowStatus: WorkflowStatus.OPEN,
-    },
-  });
+  if (isNewWorkflow) {
+    await prisma.projectStage.updateMany({
+      where: {
+        projectId: project.projectId,
+        stageOrder: 1,
+      },
+      data: {
+        workflowStatus: WorkflowStatus.OPEN,
+      },
+    });
 
-  await prisma.projectStage.updateMany({
-    where: {
-      projectId: project.projectId,
-      stageOrder: { gt: 1 },
-    },
-    data: {
-      workflowStatus: WorkflowStatus.LOCKED,
-    },
-  });
+    await prisma.projectStage.updateMany({
+      where: {
+        projectId: project.projectId,
+        stageOrder: { gt: 1 },
+      },
+      data: {
+        workflowStatus: WorkflowStatus.LOCKED,
+      },
+    });
+  }
 
   return await prisma.project.findUnique({
     where: {
@@ -396,6 +416,13 @@ export const getProjectByIdService = async (projectId) => {
   const project = await prisma.project.findUnique({
     where: { projectId: projectId },
     include: {
+      projectManager: {
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+        },
+      },
       stages: {
         orderBy: { stageOrder: "asc" }
       },
@@ -709,5 +736,57 @@ export const updateProjectService = async (projectId, data) => {
 export const deleteProjectService = async (projectId) => {
   return await prisma.project.delete({
     where: { projectId: projectId },
+  });
+};
+
+/* =========================================
+    ADD RESOURCE TO PROJECT
+========================================= */
+export const addResourceToProjectService = async (projectId, data) => {
+  const project = await prisma.project.findUnique({
+    where: { id: Number(projectId) },
+  });
+
+  if (!project) throw new Error("Project not found");
+
+  const resources = Array.isArray(project.resources) ? project.resources : [];
+
+  const email = String(data.email || "").trim().toLowerCase();
+  const staffId = String(data.staffId || "").trim();
+  const recordId = String(data.recordId || `MAN-${Date.now()}`).trim();
+
+  const resource = {
+    recordId,
+    firstName: String(data.firstName || "").trim(),
+    lastName: String(data.lastName || "").trim(),
+    email,
+    phoneNumber: String(data.phoneNumber || "").trim(),
+    staffId,
+    designation: String(data.designation || "").trim(),
+    role: String(data.role || "").trim(),
+  };
+
+  if (!resource.firstName || !resource.lastName) {
+    throw new Error("First name and last name are required");
+  }
+
+  const duplicate = resources.some(
+    (r) =>
+      (r.email && r.email.toLowerCase() === email) ||
+      (r.staffId && r.staffId === staffId) ||
+      (r.recordId && r.recordId === recordId)
+  );
+
+  if (email && duplicate) {
+    throw new Error(
+      "A resource with this email or staff ID already exists on this project"
+    );
+  }
+
+  resources.push(resource);
+
+  return await prisma.project.update({
+    where: { id: project.id },
+    data: { resources },
   });
 };
