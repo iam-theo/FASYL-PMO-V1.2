@@ -7,14 +7,13 @@ import ResourcesTab from './resources/ResourcesTab'
 import TasksTab from './tasks/TasksTab'
 import CalendarTab from './calender/CalendarTab'
 import ReportsTab from './reports/ReportsTab'
-import ViewProjectsBody from '../ViewProjectsBody';
+import ProjectLifeCycle from '../lifecycle/ProjectLifeCycle'
 import AddProjectManager from '../AddProjectManager';
 import { getTasks } from '../../../api'
 
 function ProjectWorkspace({ 
     project, 
     setProject,
-    projects,
     setProjects,
     projectManagers,
     user,
@@ -23,8 +22,6 @@ function ProjectWorkspace({
     setIsSetupModalOpen,
     activeSubTab,
     setActiveSubTab,
-    activeDetails,
-    setActiveDetails
 }) {
     // const [activeTab, setActiveTab] = useState("overview")
     const resources = project?.resources;
@@ -174,14 +171,11 @@ function ProjectWorkspace({
                 )}
 
                 {!isStaff && activeSubTab === "project_lifecycle" && (
-                    <ViewProjectsBody
-                        projects={projects}
-                        setProjects={setProjects}
+                    <ProjectLifeCycle
                         selectedProject={project}
                         setSelectedProject={setProject}
+                        setProjects={setProjects}
                         onClose={() => setActiveSubTab("overview")}
-                        activeDetails={activeDetails}
-                        setActiveDetails={setActiveDetails}
                         user={user}
                     />
                 )}

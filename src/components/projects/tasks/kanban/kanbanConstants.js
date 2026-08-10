@@ -2,6 +2,7 @@ export const STATUS_COLUMNS = [
     { key: "TODO", label: "To-Do" },
     { key: "IN_PROGRESS", label: "In Progress" },
     { key: "IN_REVIEW", label: "In Review" },
+    { key: "PENDING_CONFIRMATION", label: "Pending Confirmation" },
     { key: "DONE", label: "Done" },
 ]
 

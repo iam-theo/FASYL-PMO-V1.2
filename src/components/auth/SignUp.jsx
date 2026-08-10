@@ -2,16 +2,16 @@ import { useState } from 'react'
 import { api } from '../../api'
 import { useNotification } from '../NotificationContext'
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 function SignUp({ onClose, onSignUpComplete }) {
 
-    const [step, setStep] = useState(1)
     const [form, setForm] = useState({
         fullName: "",
         email: "",
         password: "",
         role: "PROJECTMANAGER"
     })
-    const [otp, setOtp] = useState("")
     const [loading, setLoading] = useState(false)
     const { showNotification } = useNotification()
 
@@ -19,7 +19,7 @@ function SignUp({ onClose, onSignUpComplete }) {
         setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
     }
 
-    const handleRequestOtp = async (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
         if (!form.fullName || !form.email || !form.password) {
@@ -31,45 +31,18 @@ function SignUp({ onClose, onSignUpComplete }) {
             return;
         }
 
-        try {
-            setLoading(true);
-            await api.post("/auth/signup/request-otp", form);
-            setStep(2);
-            showNotification({
-                type: "success",
-                title: "Code sent!",
-                message: `A verification code was sent to ${form.email}`
-            });
-        } catch (error) {
-            console.error(error);
+        if (!EMAIL_REGEX.test(form.email.trim())) {
             showNotification({
                 type: "error",
-                title: "Signup failed",
-                message: error.response?.data?.error || "Something went wrong"
-            });
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleVerifyOtp = async (e) => {
-        e.preventDefault();
-
-        if (!otp) {
-            showNotification({
-                type: "error",
-                title: "Missing code",
-                message: "Please enter the verification code sent to your email"
+                title: "Invalid email",
+                message: "Please enter a valid email address"
             });
             return;
         }
 
         try {
             setLoading(true);
-            const { data } = await api.post("/auth/signup/verify-otp", {
-                email: form.email,
-                otp
-            });
+            const { data } = await api.post("/auth/signup", form);
 
             localStorage.setItem("user", JSON.stringify(data.user));
             localStorage.setItem("token", data.accessToken);
@@ -85,7 +58,7 @@ function SignUp({ onClose, onSignUpComplete }) {
             console.error(error);
             showNotification({
                 type: "error",
-                title: "Verification failed",
+                title: "Signup failed",
                 message: error.response?.data?.error || "Something went wrong"
             });
         } finally {
@@ -120,104 +93,68 @@ function SignUp({ onClose, onSignUpComplete }) {
 
                 <div className='rounded-lg border border-[#0000000D] bg-[#F3F3F3] p-4'>
                     <p className='font-normal text-[13px]/[20px] text-[#636363]'>
-                        Create a <span className='font-medium text-[#1B3C4A]'>Project Manager</span> or <span className='font-medium text-[#1B3C4A]'>Staff</span> account for testing. Enter an email you can access — a one-time code will be sent to it, and it will also be used to receive notification test emails.
+                        Create a <span className='font-medium text-[#1B3C4A]'>Project Manager</span> or <span className='font-medium text-[#1B3C4A]'>Staff</span> account for testing. Your account is created immediately.
                     </p>
                 </div>
 
-                {step === 1 ? (
-                    <form className='flex flex-col gap-4' onSubmit={handleRequestOtp}>
-                        <div className='flex flex-col gap-1.5'>
-                            <label className='font-medium text-[14px]/[20px] text-[#090909]'>Full name</label>
-                            <input
-                                type="text"
-                                name="fullName"
-                                value={form.fullName}
-                                onChange={handleChange}
-                                placeholder='e.g. Test Project Manager'
-                                className={inputClass}
-                            />
-                        </div>
+                <form className='flex flex-col gap-4' onSubmit={handleSubmit}>
+                    <div className='flex flex-col gap-1.5'>
+                        <label className='font-medium text-[14px]/[20px] text-[#090909]'>Full name</label>
+                        <input
+                            type="text"
+                            name="fullName"
+                            value={form.fullName}
+                            onChange={handleChange}
+                            placeholder='e.g. Test Project Manager'
+                            className={inputClass}
+                        />
+                    </div>
 
-                        <div className='flex flex-col gap-1.5'>
-                            <label className='font-medium text-[14px]/[20px] text-[#090909]'>Email (for notifications)</label>
-                            <input
-                                type="email"
-                                name="email"
-                                value={form.email}
-                                onChange={handleChange}
-                                placeholder='e.g. pm-test@example.com'
-                                className={inputClass}
-                            />
-                        </div>
+                    <div className='flex flex-col gap-1.5'>
+                        <label className='font-medium text-[14px]/[20px] text-[#090909]'>Email</label>
+                        <input
+                            type="email"
+                            name="email"
+                            value={form.email}
+                            onChange={handleChange}
+                            placeholder='e.g. pm-test@example.com'
+                            className={inputClass}
+                        />
+                    </div>
 
-                        <div className='flex flex-col gap-1.5'>
-                            <label className='font-medium text-[14px]/[20px] text-[#090909]'>Password</label>
-                            <input
-                                type="password"
-                                name="password"
-                                value={form.password}
-                                onChange={handleChange}
-                                placeholder='Enter a password'
-                                className={inputClass}
-                            />
-                        </div>
+                    <div className='flex flex-col gap-1.5'>
+                        <label className='font-medium text-[14px]/[20px] text-[#090909]'>Password</label>
+                        <input
+                            type="password"
+                            name="password"
+                            value={form.password}
+                            onChange={handleChange}
+                            placeholder='Enter a password'
+                            className={inputClass}
+                        />
+                    </div>
 
-                        <div className='flex flex-col gap-1.5'>
-                            <label className='font-medium text-[14px]/[20px] text-[#090909]'>Role</label>
-                            <select
-                                name="role"
-                                value={form.role}
-                                onChange={handleChange}
-                                className={`${inputClass} cursor-pointer`}
-                            >
-                                <option value="PROJECTMANAGER">Project Manager</option>
-                                <option value="STAFF">Staff</option>
-                            </select>
-                        </div>
-
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className='w-full h-11 rounded-lg text-[#FFFFFF] font-medium bg-[#1B3C4A] cursor-pointer disabled:opacity-80'
+                    <div className='flex flex-col gap-1.5'>
+                        <label className='font-medium text-[14px]/[20px] text-[#090909]'>Role</label>
+                        <select
+                            name="role"
+                            value={form.role}
+                            onChange={handleChange}
+                            className={`${inputClass} cursor-pointer`}
                         >
-                            {loading ? "Sending code..." : "Send verification code"}
-                        </button>
-                    </form>
-                ) : (
-                    <form className='flex flex-col gap-4' onSubmit={handleVerifyOtp}>
-                        <div className='flex flex-col gap-1.5'>
-                            <label className='font-medium text-[14px]/[20px] text-[#090909]'>Verification code</label>
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                value={otp}
-                                onChange={(e) => setOtp(e.target.value)}
-                                placeholder='Enter the 6-digit code'
-                                className={`${inputClass} text-center tracking-[8px] font-semibold`}
-                            />
-                            <p className='font-normal text-[13px]/[20px] text-[#667085]'>
-                                Sent to {form.email}. Check your inbox (and spam folder).
-                            </p>
-                        </div>
+                            <option value="PROJECTMANAGER">Project Manager</option>
+                            <option value="STAFF">Staff</option>
+                        </select>
+                    </div>
 
-                        <div className='flex flex-col gap-2'>
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className='w-full h-11 rounded-lg text-[#FFFFFF] font-medium bg-[#1B3C4A] cursor-pointer disabled:opacity-80'
-                            >
-                                {loading ? "Verifying..." : "Verify & create account"}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setStep(1)}
-                                className='w-full h-11 rounded-lg text-[#1B3C4A] font-medium bg-[#E8E8E8] cursor-pointer'
-                            >
-                                Back to details
-                            </button>
-                        </div>
-                    </form>
-                )}
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className='w-full h-11 rounded-lg text-[#FFFFFF] font-medium bg-[#1B3C4A] cursor-pointer disabled:opacity-80'
+                    >
+                        {loading ? "Creating account..." : "Create account"}
+                    </button>
+                </form>
             </div>
         </div>
     )

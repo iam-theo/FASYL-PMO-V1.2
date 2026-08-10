@@ -10,7 +10,8 @@ function KanbanTab({
     filteredTasks, 
     openModal,
     updatePriority,
-    setDeleteTarget
+    setDeleteTarget,
+    tasksEnabled = true
 }) {
 
     const tasksByStatus = useMemo(() => {
@@ -75,7 +76,7 @@ function KanbanTab({
 
             <div className='flex-1 min-h-0 overflow-y-auto no-scrollbar px-4 py-4'>
                 {tasks.length === 0 ? (
-                    <KanbanEmptyState onCreateTask={() => openModal(true)} />
+                    <KanbanEmptyState onCreateTask={() => openModal(true)} tasksEnabled={tasksEnabled} />
                 ) : (
                     <div className='flex items-start gap-3 h-full overflow-x-auto no-scrollbar'>
                         {STATUS_COLUMNS.map((column) => (
@@ -95,7 +96,7 @@ function KanbanTab({
     )
 }
 
-function KanbanEmptyState({ onCreateTask }) {
+function KanbanEmptyState({ onCreateTask, tasksEnabled = true }) {
     return (
         <div className='flex items-center justify-center py-20 px-4'>
             <div className='w-full max-w-88 flex flex-col items-center gap-6 text-center'>
@@ -104,18 +105,20 @@ function KanbanEmptyState({ onCreateTask }) {
                         <i className="fa-solid fa-table-columns fa-xl text-[#DBDBDB]"></i>
                     </div>
                     <div className='flex flex-col items-center gap-1'>
-                        <h3 className='font-medium text-[16px]/[24px] text-[#090909]'>You have not created any tasks</h3>
-                        <p className='font-normal text-[14px]/[20px] text-[#636363]'>Click the buttton below to create a new task.</p>
+                        <h3 className='font-medium text-[16px]/[24px] text-[#090909]'>{tasksEnabled ? 'You have not created any tasks' : 'Tasks are locked for this stage'}</h3>
+                        <p className='font-normal text-[14px]/[20px] text-[#636363]'>{tasksEnabled ? 'Click the buttton below to create a new task.' : 'Task assignment opens once the project reaches Planning (stage 4).'}</p>
                     </div>
                 </div>
-                <button
-                    type="button"
-                    onClick={onCreateTask}
-                    className='w-full rounded-lg border border-[#0000000D] bg-[#1B3C4A] px-4 py-2.5 flex items-center justify-center gap-2 cursor-pointer'
-                >
-                    <PlusCircleIcon />
-                    <span className='font-medium text-[14px]/[20px] text-[#FFFFFF]'>Create Task</span>
-                </button>
+                {tasksEnabled && (
+                    <button
+                        type="button"
+                        onClick={onCreateTask}
+                        className='w-full rounded-lg border border-[#0000000D] bg-[#1B3C4A] px-4 py-2.5 flex items-center justify-center gap-2 cursor-pointer'
+                    >
+                        <PlusCircleIcon />
+                        <span className='font-medium text-[14px]/[20px] text-[#FFFFFF]'>Create Task</span>
+                    </button>
+                )}
             </div>
         </div>
     )

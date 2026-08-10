@@ -1,5 +1,7 @@
 // uploadUtils.js
 
+import { MAX_UPLOAD_MB } from "../../../../constants/uploads";
+
 export const validateImageDimensions = (file) => {
     return new Promise((resolve) => {
         const img = new Image();
@@ -21,7 +23,7 @@ export const validateImageDimensions = (file) => {
 export const processFile = async (file, options = {}) => {
     const {
         allowedTypes = [],
-        maxSizeMB = 5,
+        maxSizeMB = MAX_UPLOAD_MB,
     } = options;
 
     if (!file) {

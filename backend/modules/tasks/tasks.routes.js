@@ -88,7 +88,7 @@ const router = express.Router();
 router.post(
     "/", 
     authMiddleWare,
-    allowRoles(ROLES.PROJECTMANAGER),
+    allowRoles(ROLES.HEADOFOPS, ROLES.PROJECTMANAGER),
     uploadLimiter,
     uploadTaskDocumentFile,
     createTask
@@ -209,7 +209,8 @@ router.get("/:id", getTask);
  *                 type: string
  *               status:
  *                 type: string
- *                 enum: [TODO, IN_PROGRESS, IN_REVIEW, BLOCKED, DONE, CANCELLED]
+ *                 enum: [TODO, IN_PROGRESS, IN_REVIEW, BLOCKED, PENDING_CONFIRMATION, DONE, CANCELLED]
+ *                 description: Staff setting PENDING_CONFIRMATION must attach a proof document (multipart `file`); only a Project Manager can move a pending task to DONE.
  *               priority:
  *                 type: string
  *                 enum: [LOW, MEDIUM, HIGH, URGENT]
@@ -238,7 +239,9 @@ router.get("/:id", getTask);
 router.patch(
     "/:id", 
     authMiddleWare,
-    allowRoles(ROLES.PROJECTMANAGER, ROLES.STAFF),
+    allowRoles(ROLES.HEADOFOPS, ROLES.PROJECTMANAGER, ROLES.STAFF),
+    uploadLimiter,
+    uploadTaskDocumentFile,
     updateTask
 );
 

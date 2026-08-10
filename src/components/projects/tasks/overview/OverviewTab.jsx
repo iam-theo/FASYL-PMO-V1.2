@@ -1,4 +1,5 @@
 import StatCard from "./StatCard";
+import OverviewProjectDetails from "./OverviewProjectDetails";
 import OverviewCalendarSection from "./OverviewCalendarSection";
 import OverviewResourcesSection from "./OverviewResourcesSection";
 import OverviewReminderSection from "./OverviewReminderSection";
@@ -30,6 +31,8 @@ function OverviewTab({
 
   return (
     <div className="flex flex-col gap-6 px-4 py-4">
+      <OverviewProjectDetails project={project} />
+
       <div className="flex items-stretch gap-2 flex-wrap md:flex-nowrap">
         <StatCard
           value={totalTasks}

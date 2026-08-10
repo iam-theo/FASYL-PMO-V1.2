@@ -2,11 +2,14 @@ import { useMemo, useState } from 'react'
 import { ChevronDownIcon, CheckboxCheckIcon, MoreVerticalIcon, TrashIcon, PlusCircleIcon } from '../icons'
 import CreateTaskModal from './CreateTaskModal'
 import DeleteTaskModal from './DeleteTaskModal'
+import SubmitProofModal from './SubmitProofModal'
 import KanbanTab from '../kanban/KanbanTab'
 import {
     TASK_STATUS_OPTIONS,
     TASK_PRIORITY_OPTIONS,
     PRIORITY_BADGE_COLORS,
+    TASK_STATUS_LABELS,
+    areTasksEnabledForProject,
 } from './taskConstants'
 import { DUE_DATE_FILTERS, matchesDueDateFilter } from './dueDateFilters'
 import { createTask, deleteTask, updateTask } from '../../../../api'
@@ -34,6 +37,8 @@ function TasksTab({
 
     const effectiveReadOnly = readOnly || viewOnly;
 
+    const tasksEnabled = areTasksEnabledForProject(project);
+
     const [view, setView] = useState('list')
     const [selectedIds, setSelectedIds] = useState([])
     const [isEditing, setIsEditing] = useState(false)
@@ -49,6 +54,7 @@ function TasksTab({
 
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [deleteTarget, setDeleteTarget] = useState(null) // { ids: [...] } | null
+    const [proofTarget, setProofTarget] = useState(null) // task awaiting proof upload
 
     const assigneeOptions = useMemo(() => {
         const members = [...resources, ...tasks.map(t => t.assignedTo)]
@@ -130,7 +136,29 @@ function TasksTab({
     };
 
 
+    const applyUpdatedTask = (updatedTask) => {
+        setTasks((prevTasks) =>
+            prevTasks
+                .map((task) =>
+                    task.id === updatedTask.id ? updatedTask : task
+                )
+                .sort(
+                    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+                )
+        );
+    };
+
+    const isStaffUser = loggedInUser?.role === "STAFF";
+
     const handleStatusChange = async (taskId, newStatus) => {
+
+        // Staff cannot mark a task done directly — they must attach proof of
+        // completion, which lands the task in PENDING_CONFIRMATION.
+        if (isStaffUser && (newStatus === "DONE" || newStatus === "PENDING_CONFIRMATION")) {
+            const task = tasks.find((t) => t.id === taskId);
+            if (task) setProofTarget(task);
+            return;
+        }
 
         try {
 
@@ -140,18 +168,40 @@ function TasksTab({
 
             console.log("updatedTask", updatedTask);
 
-            setTasks((prevTasks) =>
-                prevTasks
-                    .map((task) =>
-                        task.id === updatedTask.id ? updatedTask : task
-                    )
-                    .sort(
-                        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-                    )
-            );
+            applyUpdatedTask(updatedTask);
 
         } catch (err) {
             console.error(err);
+        }
+    };
+
+    const handleSubmitProof = async (task, file) => {
+        try {
+            const response = await updateTask(task.id, {
+                status: "PENDING_CONFIRMATION",
+                file,
+            });
+
+            const updatedTask = response.data;
+
+            applyUpdatedTask(updatedTask);
+
+            setProofTarget(null);
+
+            showNotification({
+                type: "success",
+                title: "Proof Submitted",
+                message: "Task submitted for project manager confirmation."
+            });
+
+        } catch (err) {
+            console.error(err);
+
+            showNotification({
+                type: "error",
+                title: "Submission Failed",
+                message: "Unable to submit proof of completion."
+            });
         }
     };
 
@@ -374,9 +424,9 @@ function TasksTab({
                     </div>
 
                     <div className='flex items-center gap-3'>
-                        {!effectiveReadOnly && <ViewToggle view={view} onChange={setView} />}
+                        {!effectiveReadOnly && tasksEnabled && <ViewToggle view={view} onChange={setView} />}
 
-                        {!effectiveReadOnly && (
+                        {!effectiveReadOnly && tasksEnabled && (
                             <button
                                 type="button"
                                 className='px-4 py-2.5 rounded-lg border border-[#0000000D] bg-[#E8E8E8] flex items-center gap-2 cursor-pointer'
@@ -386,7 +436,7 @@ function TasksTab({
                             </button>
                         )}
 
-                        {!effectiveReadOnly && (
+                        {!effectiveReadOnly && tasksEnabled && (
                             <button
                                 type="button"
                                 onClick={() => setIsCreateModalOpen(true)}
@@ -421,6 +471,15 @@ function TasksTab({
                         options={DUE_DATE_FILTERS}
                     />
                 </div>
+
+                {!tasksEnabled && !effectiveReadOnly && (
+                    <div className='rounded-lg border border-[#0000000D] bg-[#FFF4E5] p-4 flex items-center gap-3'>
+                        <i className="fa-solid fa-lock text-[#B54708]"></i>
+                        <p className='font-normal text-[14px]/[20px] text-[#7A2E0E]'>
+                            Task assignment is not enabled yet. Stages 1-3 (Client ID, Engagement, Initiation) must be signed off before the project reaches Planning (stage 4).
+                        </p>
+                    </div>
+                )}
 
                 {!effectiveReadOnly && selectedIds.length > 0 && (
                     <div className='rounded-lg border border-[#0000000D] bg-[#FFFFFF80] p-4 flex items-center justify-between flex-wrap gap-3'>
@@ -475,6 +534,7 @@ function TasksTab({
                             updatePriority={handlePriorityChange}
                             // viewToggle={<ViewToggle view={view} onChange={setView} />}
                             setDeleteTarget={setDeleteTarget}
+                            tasksEnabled={tasksEnabled}
                         />
                     )
             }
@@ -484,7 +544,11 @@ function TasksTab({
                     (
                         <div className='flex-1 min-h-0 w-full overflow-y-auto no-scrollbar px-4 py-4'>
                             {tasks.length === 0 ? (
-                                <TasksEmptyState readOnly={effectiveReadOnly} onCreateTask={() => setIsCreateModalOpen(true)} />
+                                <TasksEmptyState
+                                    readOnly={effectiveReadOnly}
+                                    locked={!tasksEnabled && !effectiveReadOnly}
+                                    onCreateTask={() => setIsCreateModalOpen(true)}
+                                />
                             ) : (
                                 <div className='rounded-lg border border-[#0000000D] bg-[#F9FAFB] w-full overflow-x-auto'>
                                     <table className='border-collapse table-auto min-w-max'>
@@ -601,8 +665,28 @@ function TasksTab({
                                                     <td className='px-6 py-4'>
                                                         {viewOnly ? (
                                                             <span className='inline-flex items-center rounded-lg px-3.5 py-2.5 font-normal text-[12px]/[24px] text-[#667085] bg-[#F2F4F7]'>
-                                                                {task.status}
+                                                                {TASK_STATUS_LABELS[task.status] ?? task.status}
                                                             </span>
+                                                        ) : task.status === "PENDING_CONFIRMATION" && loggedInUser?.role === "PROJECTMANAGER" ? (
+                                                        <div
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className='flex items-center gap-2'
+                                                        >
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleStatusChange(task.id, "DONE")}
+                                                                className='rounded-lg bg-[#1B3C4A] px-3.5 py-2 font-medium text-[12px]/[24px] text-[#FFFFFF] cursor-pointer'
+                                                            >
+                                                                Confirm
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleStatusChange(task.id, "IN_PROGRESS")}
+                                                                className='rounded-lg border border-[#D0D5DD] bg-[#FFFFFF] px-3.5 py-2 font-medium text-[12px]/[24px] text-[#344054] cursor-pointer'
+                                                            >
+                                                                Send Back
+                                                            </button>
+                                                        </div>
                                                         ) : (
                                                         <div 
                                                             onClick={(e) => e.stopPropagation()}
@@ -618,7 +702,7 @@ function TasksTab({
                                                                     <option 
                                                                         key={index} 
                                                                         value={option}>
-                                                                        {option}
+                                                                        {TASK_STATUS_LABELS[option] ?? option}
                                                                     </option>
                                                                 ))}
                                                             </select>
@@ -724,6 +808,14 @@ function TasksTab({
                     onConfirm={handleConfirmDelete}
                 />
             )}
+
+            {proofTarget && (
+                <SubmitProofModal
+                    task={proofTarget}
+                    onCancel={() => setProofTarget(null)}
+                    onSubmit={handleSubmitProof}
+                />
+            )}
         </div>
     )
 }
@@ -775,7 +867,7 @@ function FilterSelect({ value, onChange, options }) {
     )
 }
 
-function TasksEmptyState({ onCreateTask, readOnly = false }) {
+function TasksEmptyState({ onCreateTask, readOnly = false, locked = false }) {
     return (
         <div className='flex items-center justify-center py-20 px-4'>
             <div className='w-full max-w-88 flex flex-col items-center gap-6 text-center'>
@@ -784,11 +876,11 @@ function TasksEmptyState({ onCreateTask, readOnly = false }) {
                         <i className="fa-solid fa-list-check fa-xl text-[#DBDBDB]"></i>
                     </div>
                     <div className='flex flex-col items-center gap-1'>
-                        <h3 className='font-medium text-[16px]/[24px] text-[#090909]'>{readOnly ? 'No tasks assigned to you' : 'You have not created any tasks'}</h3>
-                        <p className='font-normal text-[14px]/[20px] text-[#636363]'>{readOnly ? 'Tasks assigned to you will appear here.' : 'Click the buttton below to create a new task.'}</p>
+                        <h3 className='font-medium text-[16px]/[24px] text-[#090909]'>{locked ? 'Tasks are locked for this stage' : readOnly ? 'No tasks assigned to you' : 'You have not created any tasks'}</h3>
+                        <p className='font-normal text-[14px]/[20px] text-[#636363]'>{locked ? 'Task assignment opens once the project reaches Planning (stage 4).' : readOnly ? 'Tasks assigned to you will appear here.' : 'Click the buttton below to create a new task.'}</p>
                     </div>
                 </div>
-                {!readOnly && (
+                {!readOnly && !locked && (
                     <button
                         type="button"
                         onClick={onCreateTask}

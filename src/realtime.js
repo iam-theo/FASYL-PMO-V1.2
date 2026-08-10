@@ -29,7 +29,15 @@ const WS_URL = (() => {
     const protocol = url.protocol === "https:" ? "wss:" : "ws:";
     return `${protocol}//${url.host}/ws`;
   } catch {
-    return "ws://localhost:5000/ws";
+    // VITE_API_BASE_URL is a relative path (same-origin deployment such as
+    // "/api/v1"), so resolve it against the browser origin.
+    try {
+      const url = new URL(api, window.location.origin);
+      const protocol = url.protocol === "https:" ? "wss:" : "ws:";
+      return `${protocol}//${url.host}/ws`;
+    } catch {
+      return "ws://localhost:5000/ws";
+    }
   }
 })();
 

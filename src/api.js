@@ -247,7 +247,27 @@ export const getTasks = async (projectId, stageOrder) => {
 
 export const updateTask = async (taskId, payload) => {
   try {
-    const { data } = await api.patch(`/tasks/${taskId}`, payload);
+    let request = payload;
+
+    // When the payload carries a file (e.g. proof of completion) it must be
+    // multipart/form-data so multer can pick it up.
+    const hasFile = Object.values(payload).some(
+      (value) => value instanceof File,
+    );
+
+    if (hasFile) {
+      const formData = new FormData();
+
+      Object.entries(payload).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          formData.append(key, value);
+        }
+      });
+
+      request = formData;
+    }
+
+    const { data } = await api.patch(`/tasks/${taskId}`, request);
 
     return data;
   } catch (error) {

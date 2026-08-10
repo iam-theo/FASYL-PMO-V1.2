@@ -10,6 +10,7 @@ import {
   addResourceToProjectService,
 } from "./project.service.js";
 import { notifyProjectAssignment } from "../notifications/notification.service.js";
+import { storeUploadedFile } from "../../utils/upload.service.js";
 
 /* =========================================
     CREATE PROJECT
@@ -214,8 +215,7 @@ export const uploadStageDocument = async (req, res) => {
       });
     }
 
-    const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "http://localhost:5000";
-    const fileUrl = `${PUBLIC_BASE_URL.replace(/\/+$/, "")}/uploads/${file.filename}`;
+    const fileUrl = await storeUploadedFile(file);
 
     const filename = `${file.originalname}`;
 

@@ -4,8 +4,7 @@ import {
   refreshTokenService,
   logoutUser,
   getProjectManagersService,
-  requestSignupOtpService,
-  verifySignupOtpService
+  signupUser,
 } from "./auth.service.js";
 
 /* =========================
@@ -25,25 +24,11 @@ export const register = async (req, res) => {
 };
 
 /* =========================
-   OTP SIGNUP (TEST ACCOUNTS)
+   SIGNUP (TEST ACCOUNTS)
 ========================= */
-export const requestSignupOtp = async (req, res) => {
+export const signup = async (req, res) => {
   try {
-    const result = await requestSignupOtpService(req.body);
-
-    res.status(200).json({
-      success: true,
-      ...result,
-    });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-};
-
-export const verifySignupOtp = async (req, res) => {
-  try {
-    const { user, accessToken, refreshToken } =
-      await verifySignupOtpService(req.body);
+    const { user, accessToken, refreshToken } = await signupUser(req.body);
 
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
@@ -53,7 +38,7 @@ export const verifySignupOtp = async (req, res) => {
     });
 
     res.status(201).json({
-      message: "Signup successful",
+      message: "Account created successfully",
       user,
       accessToken,
     });

@@ -48,3 +48,18 @@ React (Vite, plain JS/JSX) frontend in `src/` + Express backend in `backend/`, o
 - **Database**: Neon Postgres (`.env` `DATABASE_URL`), already migrated (`npx prisma migrate deploy --schema backend/prisma/schema.prisma` from the deployed dir). `UPLOAD_DIR` in the deployed `.env` is absolute; the repo `.env` uses the repo path.
 - **Port 5001 is taken** by an unrelated app; 5000 by the old `sflbk.com` deployment. Use 5002+ for this app.
 - `SALES_API_URL` (10.10.1.20:9098) is **not reachable from this host** — the sync cron logs `ECONNREFUSED` every minute but the server stays up. Do not mistake that log noise for a crash.
+
+## Vercel deployment (serverless)
+
+The same codebase also deploys to Vercel. The Express app is exported as a serverless Function; it is **not** a long-lived server there.
+
+- **Entrypoints**:
+  - `api/index.js` — default-exported `http.Server` with the WebSocketServer attached (the documented Express-on-Vercel pattern). `vercel.json` rewrites `/api/*`, `/docs`, `/ws`, `/uploads/*` to it; everything else is SPA-served from `dist/`.
+  - `api/cron/reminders.js` + `api/cron/sales-sync.js` — replace the node-cron jobs (`server.js` only starts those on a persistent host). Both check `CRON_SECRET`.
+- **Backend structure**: `backend/app.js` holds the Express app + Prisma instance (shared by `server.js`, `api/index.js`, cron functions). `server.js` is now only the persistent-host entry (listen + realtime + cron + graceful shutdown).
+- **Realtime**: `backend/modules/realtime/realtime.service.js` + `redis.pubsub.js`. On Vercel, function instances don't share memory, so `sendToUser`/`broadcast` publish to Redis (`REDIS_URL`, e.g. Upstash) and every instance relays to its own sockets. Without `REDIS_URL` it degrades to same-instance-only delivery. WebSocket connections are capped by the plan (Hobby: 300s) — the client in `src/realtime.js` already reconnects.
+- **Uploads**: `backend/utils/upload.service.js` stores to **Vercel Blob** when `BLOB_READ_WRITE_TOKEN` is set, else local `UPLOAD_DIR` (dev/VPS). Multer uses memory storage. Vercel hard-caps request bodies at **4.5MB**, so the Vercel project must set `MAX_UPLOAD_MB=4` (backend) and `VITE_MAX_UPLOAD_MB=4` (frontend, build-time) — see `src/constants/uploads.js`.
+- **Crons**: `vercel.json` uses daily schedules (`0 6 * * *`, `0 7 * * *`) because **Hobby plans reject cron expressions that run more than once per day**. `processDueReminders()` catches up any reminders that fell due between runs, so nothing is lost, only delayed. Upgrade to Pro to restore per-minute cadence.
+- **Prisma**: `postinstall` runs `prisma generate --schema backend/prisma/schema.prisma`; the generator has `binaryTargets = ["native", "rhel-openssl-3.0.x"]` (Amazon Linux 2023 runtime).
+- **Env vars to set in the Vercel project**: `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `ACCESS_TOKEN_EXPIRES_IN`, `REFRESH_TOKEN_EXPIRES_IN`, `PUBLIC_API_URL` (https://<app>.vercel.app/api/v1), `APP_BASE_URL` (https://<app>.vercel.app), `CORS_ORIGINS` (https://<app>.vercel.app), `PUBLIC_BASE_URL`, `CRON_SECRET`, `MAX_UPLOAD_MB=4`, `VITE_API_BASE_URL=/api/v1`, `VITE_MAX_UPLOAD_MB=4`, `REDIS_URL`, `BLOB_READ_WRITE_TOKEN`, `SMTP_*`, `SALES_API_URL` (optional; likely unreachable from Vercel).
+- **Deploy**: `npx vercel --prod` after `npx vercel link`. New projects get Fluid compute by default, which WebSockets require. `BLOB_READ_WRITE_TOKEN` and `REDIS_URL` are provisioned from the Vercel Blob store / Upstash respectively.

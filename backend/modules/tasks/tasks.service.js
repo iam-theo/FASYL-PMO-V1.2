@@ -3,7 +3,7 @@ import { ROLES } from "../../constants/roles.js";
 import { formatTask } from "./tasks.utils.js";
 // import { createReminderService } from "../reminders/reminder.service.js";
 import { createReminder } from "../reminders/reminder.controller.js";
-import { notifyTaskAssignment } from "../notifications/notification.service.js";
+import { notifyTaskAssignment, createInAppNotification } from "../notifications/notification.service.js";
 
 const findResourceAssignee = (projectResources, recordId) => {
   const resources = Array.isArray(projectResources) ? projectResources : [];
@@ -27,6 +27,7 @@ export const createTaskService = async (body, user, document = null) => {
         projectId,
         stageOrder,
         assignedResourceId,
+        assignedToUserId,
         title,
         description,
         priority,
@@ -37,6 +38,7 @@ export const createTaskService = async (body, user, document = null) => {
     const { id: loggedInUserId, role } = user;
 
     let taskAssignedResourceId;
+    let taskAssignedToUserId;
 
     if (!projectId || !title) throw new Error("Project ID and title are required");
 
@@ -47,6 +49,16 @@ export const createTaskService = async (body, user, document = null) => {
     })
 
     if(!project) throw new Error("Project not found");
+
+    // Task assignment is only enabled once the project reaches the Planning
+    // stage (stage 4), i.e. stages 1-3 (Client ID, Engagement, Initiation)
+    // have been signed off.
+    const TASKS_ENABLED_FROM_STAGE = 4;
+    if ((project.currentStageOrder ?? 0) < TASKS_ENABLED_FROM_STAGE) {
+        throw new Error(
+            "Task assignment is not enabled yet. Stages 1-3 (Client ID, Engagement, Initiation) must be signed off before the project reaches Planning (stage 4)."
+        );
+    }
 
     const projectResources = Array.isArray(project.resources) ? project.resources : [];
 
@@ -77,6 +89,24 @@ export const createTaskService = async (body, user, document = null) => {
 
         taskAssignedResourceId = resource.recordId;
 
+    } else if (role === ROLES.HEADOFOPS) {
+
+        if (!assignedToUserId) throw new Error("A Project Manager must be selected");
+
+        const assignee = await prisma.user.findUnique({
+            where: {
+                id: Number(assignedToUserId)
+            }
+        });
+
+        if (!assignee) throw new Error("The selected user was not found.");
+
+        if (assignee.role !== ROLES.PROJECTMANAGER) {
+            throw new Error("Tasks can only be assigned to a Project Manager.");
+        }
+
+        taskAssignedToUserId = assignee.id;
+
     } else {
         throw new Error("You are not authorized to assign tasks.")
     }
@@ -96,7 +126,7 @@ export const createTaskService = async (body, user, document = null) => {
 
             assignedById: loggedInUserId,
             createdById: loggedInUserId,
-            assignedToUserId: null,
+            assignedToUserId: taskAssignedToUserId ?? null,
             assignedResourceId: taskAssignedResourceId,
             documents: document ? [document] : undefined
         },
@@ -466,7 +496,19 @@ export const updateTaskService = async (
     if(!task) throw new Error("Task not found")
 
     if (user && user.role === ROLES.HEADOFOPS) {
-        throw new Error("You are not authorized to update tasks");
+        if (body.assignedToUserId !== undefined) {
+            const assignee = await prisma.user.findUnique({
+                where: {
+                    id: Number(body.assignedToUserId)
+                }
+            });
+
+            if (!assignee) throw new Error("The selected user was not found.");
+
+            if (assignee.role !== ROLES.PROJECTMANAGER) {
+                throw new Error("Tasks can only be assigned to a Project Manager.");
+            }
+        }
     }
 
     const previousAssignedToUserId = task.assignedToUserId;
@@ -491,10 +533,35 @@ export const updateTaskService = async (
             throw new Error("You are not authorized to update this task");
         }
 
-        // Staff may only change the status of their own tasks.
+        // Staff may only change the status of their own tasks, plus attach
+        // proof-of-completion documents to that status change.
         allowedBody = {
-            ...(body.status !== undefined && { status: body.status })
+            ...(body.status !== undefined && { status: body.status }),
+            ...(Array.isArray(body.documents) && {
+                documents: body.documents
+            })
         };
+    }
+
+    const isStaff = user && user.role === ROLES.STAFF;
+    const status = allowedBody.status;
+
+    if (isStaff) {
+        // Staff cannot mark a task done directly — completion has to go
+        // through the project manager via PENDING_CONFIRMATION.
+        if (status === "DONE") {
+            throw new Error(
+                "You cannot mark a task as done directly. Submit proof of completion for the project manager to confirm it."
+            );
+        }
+
+        // Marking a task "complete but awaiting confirmation" requires proof.
+        if (
+            status === "PENDING_CONFIRMATION" &&
+            !(Array.isArray(allowedBody.documents) && allowedBody.documents.length > 0)
+        ) {
+            throw new Error("A proof of completion document is required.");
+        }
     }
 
     const data = {
@@ -513,10 +580,18 @@ export const updateTaskService = async (
         ...(allowedBody.status !== undefined && {
             status: allowedBody.status,
             completedAt:
-                allowedBody.status === "COMPLETED"
+                allowedBody.status === "DONE"
                     ? new Date()
                     : null
         }),
+
+        ...(Array.isArray(allowedBody.documents) &&
+            allowedBody.documents.length > 0 && {
+                documents: [
+                    ...(Array.isArray(task.documents) ? task.documents : []),
+                    ...allowedBody.documents,
+                ]
+            }),
 
         ...(allowedBody.startDate !== undefined && {
             startDate: allowedBody.startDate
@@ -619,6 +694,58 @@ export const updateTaskService = async (
                 assignedBy: updatedTask.assignedBy
             }).catch((error) => {
                 console.error("Task assignment notification failed:", error.message);
+            });
+        }
+    }
+
+    const statusChanged = updatedTask.status !== task.status;
+
+    if (statusChanged) {
+        const wasPending = task.status === "PENDING_CONFIRMATION";
+        const isPending = updatedTask.status === "PENDING_CONFIRMATION";
+        const confirmed = updatedTask.status === "DONE" && wasPending;
+
+        const projectInfo = await prisma.project.findUnique({
+            where: { id: task.projectId },
+            select: {
+                projectId: true,
+                projectName: true,
+                projectManagerId: true
+            }
+        });
+
+        // The assignee submitted proof — surface it to the project manager so
+        // the completion can be reviewed and confirmed.
+        if (isPending && projectInfo?.projectManagerId) {
+            createInAppNotification({
+                userId: projectInfo.projectManagerId,
+                projectId: projectInfo.projectId,
+                type: "TASK_COMPLETION_SUBMITTED",
+                title: "Task awaiting confirmation",
+                message: `"${updatedTask.title}" was marked complete and awaits your confirmation.`,
+                data: {
+                    projectId: projectInfo.projectId,
+                    projectName: projectInfo.projectName,
+                    taskId,
+                    taskTitle: updatedTask.title
+                }
+            });
+        }
+
+        // The PM confirmed the completion — let the assignee know.
+        if (confirmed && updatedTask.assignedToUserId) {
+            createInAppNotification({
+                userId: updatedTask.assignedToUserId,
+                projectId: projectInfo?.projectId ?? null,
+                type: "TASK_COMPLETION_CONFIRMED",
+                title: "Task confirmed complete",
+                message: `Your task "${updatedTask.title}" was confirmed complete.`,
+                data: {
+                    projectId: projectInfo?.projectId ?? null,
+                    projectName: projectInfo?.projectName ?? null,
+                    taskId,
+                    taskTitle: updatedTask.title
+                }
             });
         }
     }

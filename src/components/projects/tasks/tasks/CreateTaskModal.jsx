@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
 import { CloseIcon, CheckCircleIcon, ChevronDownIcon, CalendarIcon, TrashIcon } from '../icons/index'
 import { TASK_PRIORITY_OPTIONS } from './taskConstants'
+import { MAX_UPLOAD_MB, MAX_FILE_SIZE } from '../../../../constants/uploads'
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_FILE_TYPES = ["image/svg+xml", "image/jpeg", "application/pdf"];
 
 function CreateTaskModal({ 
@@ -62,7 +62,7 @@ function CreateTaskModal({
         }
 
         if (file.size > MAX_FILE_SIZE) {
-            setFileError("File is too large. Maximum allowed size is 5MB");
+            setFileError(`File is too large. Maximum allowed size is ${MAX_UPLOAD_MB}MB`);
             setSelectedFile(null);
             return;
         }
@@ -293,7 +293,7 @@ function CreateTaskModal({
                                     <p className='font-normal text-[14px]/[20px] text-[#636363]'>
                                         <span className='text-[#1B3C4A] font-medium'>Click to upload</span> or drag and drop
                                     </p>
-                                    <p className='font-normal text-[14px]/[20px] text-[#636363]'>SVG, JPG, or PDF (max. 5MB)</p>
+                                    <p className='font-normal text-[14px]/[20px] text-[#636363]'>SVG, JPG, or PDF (max. {MAX_UPLOAD_MB}MB)</p>
                                     {fileError && (
                                         <p className='text-[14px]/[20px] text-[#D20019] font-normal'>{fileError}</p>
                                     )}

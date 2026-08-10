@@ -5,8 +5,7 @@ import {
   refresh,
   logout,
   getProjectManagers,
-  requestSignupOtp,
-  verifySignupOtp
+  signup,
 } from "./auth.controller.js";
 
 import {
@@ -105,9 +104,9 @@ router.post(
 
 /**
  * @swagger
- * /auth/signup/request-otp:
+ * /auth/signup:
  *   post:
- *     summary: Request an OTP to create a Project Manager or Staff test account
+ *     summary: Create a Project Manager or Staff test account directly
  *     tags: [Authentication]
  *     requestBody:
  *       required: true
@@ -136,51 +135,16 @@ router.post(
  *                   - PROJECTMANAGER
  *                   - STAFF
  *     responses:
- *       200:
- *         description: Verification code sent to the email address
+ *       201:
+ *         description: Account created and signed in
  *       400:
  *         description: Validation error
  */
 router.post(
-  "/signup/request-otp",
+  "/signup",
   registerLimiter,
   authSlowDown,
-  requestSignupOtp
-);
-
-/**
- * @swagger
- * /auth/signup/verify-otp:
- *   post:
- *     summary: Verify the OTP and create the account
- *     tags: [Authentication]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - otp
- *             properties:
- *               email:
- *                 type: string
- *                 example: pm-test@example.com
- *               otp:
- *                 type: string
- *                 example: "123456"
- *     responses:
- *       201:
- *         description: Account created and signed in
- *       400:
- *         description: Invalid or expired code
- */
-router.post(
-  "/signup/verify-otp",
-  registerLimiter,
-  authSlowDown,
-  verifySignupOtp
+  signup
 );
 
 /**

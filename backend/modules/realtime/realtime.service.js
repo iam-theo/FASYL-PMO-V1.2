@@ -1,13 +1,24 @@
 import { WebSocketServer } from "ws";
 import jwt from "jsonwebtoken";
+import {
+  isPubSubActive,
+  publishEvent,
+  setRemoteEventHandler,
+  startPubSub,
+  stopPubSub,
+} from "./redis.pubsub.js";
 
 /**
  * Realtime hub for push events (notifications, project refreshes, ...).
  *
- * A single WebSocketServer is attached to the Express HTTP server on the
- * `/ws` path. Clients authenticate with `?token=<access token>` in the URL
- * (browser WebSocket API cannot set headers), then register under their user
- * id so events can be routed per recipient.
+ * A single WebSocketServer is attached to the HTTP server on the `/ws` path.
+ * Clients authenticate with `?token=<access token>` in the URL (browser
+ * WebSocket API cannot set headers), then register under their user id so
+ * events can be routed per recipient.
+ *
+ * Delivery goes through Redis pub/sub when `REDIS_URL` is set so events reach
+ * sockets on any serverless instance. Without Redis it degrades to a
+ * same-process in-memory hub.
  */
 
 /** userId -> Set<WebSocket> */
@@ -40,32 +51,67 @@ const unregister = (userId, socket) => {
   if (set.size === 0) clients.delete(userId);
 };
 
-/**
- * Sends an event to every socket of one user. Safe to call from any service —
- * it no-ops when the user has no live connection.
- */
-export const sendToUser = (userId, event, payload) => {
+/** Delivers an event to every socket of one user on this instance. */
+const deliverToUser = (userId, event, payload) => {
   if (userId == null) return;
   const set = clients.get(Number(userId));
   if (!set) return;
   for (const socket of set) send(socket, event, payload);
 };
 
-/**
- * Sends an event to every connected user.
- */
-export const broadcast = (event, payload) => {
+/** Delivers an event to every connected socket on this instance. */
+const broadcastLocally = (event, payload) => {
   for (const set of clients.values()) {
     for (const socket of set) send(socket, event, payload);
   }
 };
 
+/** Handles an event arriving over the Redis channel. */
+const handleRemoteEvent = ({ userId, event, payload }) => {
+  if (userId == null) {
+    broadcastLocally(event, payload);
+  } else {
+    deliverToUser(userId, event, payload);
+  }
+};
+
+/**
+ * Sends an event to every socket of one user. Safe to call from any service —
+ * it no-ops when the user has no live connection. With Redis configured the
+ * subscriber on this instance delivers the message; otherwise it is delivered
+ * directly from here.
+ */
+export const sendToUser = (userId, event, payload) => {
+  if (userId == null) return;
+  if (isPubSubActive()) {
+    publishEvent({ userId, event, payload });
+  } else {
+    deliverToUser(userId, event, payload);
+  }
+};
+
+/**
+ * Sends an event to every connected user (across all instances when Redis is
+ * configured).
+ */
+export const broadcast = (event, payload) => {
+  if (isPubSubActive()) {
+    publishEvent({ userId: null, event, payload });
+  } else {
+    broadcastLocally(event, payload);
+  }
+};
+
 /**
  * Attaches the WebSocketServer to an existing HTTP server. Call once, right
- * after `app.listen(...)` returns its server instance.
+ * after the server is created. Starts the Redis subscriber for cross-instance
+ * fan-out.
  */
 export const setupRealtime = (server) => {
   const wss = new WebSocketServer({ server, path: "/ws" });
+
+  setRemoteEventHandler(handleRemoteEvent);
+  startPubSub();
 
   wss.on("connection", (socket, request) => {
     let userId = null;
@@ -122,4 +168,9 @@ export const setupRealtime = (server) => {
   wss.on("close", () => clearInterval(interval));
 
   return wss;
+};
+
+/** Stops the WebSocketServer's heartbeat and disconnects Redis. */
+export const stopRealtime = () => {
+  stopPubSub();
 };

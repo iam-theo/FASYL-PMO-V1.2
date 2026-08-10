@@ -1,7 +1,9 @@
 import { ChevronDownIcon } from '../icons'
 import { ChevronRightIcon } from './icons'
-import { TASK_STATUS_OPTIONS, TASK_PRIORITY_OPTIONS, PRIORITY_BADGE_COLORS } from '../tasks/taskConstants'
+import { TASK_STATUS_OPTIONS, TASK_PRIORITY_OPTIONS, PRIORITY_BADGE_COLORS, TASK_STATUS_LABELS } from '../tasks/taskConstants'
 import { updateTask } from '../../../../api'
+import SubmitProofModal from '../tasks/SubmitProofModal'
+import { useState } from 'react'
 
 const PREVIEW_COUNT = 5
 
@@ -10,17 +12,47 @@ function OverviewActiveTasksSection({ tasks = [], setTasks, onSeeAll, onNavigate
     const effectiveReadOnly = readOnly || viewOnly
     const isClickable = typeof onNavigate === "function";
 
+    const [proofTarget, setProofTarget] = useState(null)
+
+    const applyUpdatedTask = (updatedTask) => {
+        setTasks((prevTasks) =>
+            prevTasks.map((task) => (task.id === updatedTask.id ? updatedTask : task))
+        )
+    }
+
     const handleStatusChange = async (taskId, newStatus) => {
         try {
             const response = await updateTask(taskId, { status: newStatus })
             const updatedTask = response.data
 
-            setTasks((prevTasks) =>
-                prevTasks.map((task) => (task.id === updatedTask.id ? updatedTask : task))
-            )
+            applyUpdatedTask(updatedTask)
         } catch (err) {
             console.error(err)
         }
+    }
+
+    const handleSubmitProof = async (task, file) => {
+        try {
+            const response = await updateTask(task.id, {
+                status: "PENDING_CONFIRMATION",
+                file,
+            })
+            const updatedTask = response.data
+
+            applyUpdatedTask(updatedTask)
+            setProofTarget(null)
+        } catch (err) {
+            console.error(err)
+        }
+    }
+
+    const handleStaffStatusChange = (taskId, newStatus) => {
+        if (newStatus === "DONE" || newStatus === "PENDING_CONFIRMATION") {
+            const task = tasks.find((t) => t.id === taskId)
+            if (task) setProofTarget(task)
+            return
+        }
+        handleStatusChange(taskId, newStatus)
     }
 
     const handlePriorityChange = async (taskId, newPriority) => {
@@ -128,18 +160,22 @@ function OverviewActiveTasksSection({ tasks = [], setTasks, onSeeAll, onNavigate
                                     <td className='px-6 py-4'>
                                         {viewOnly ? (
                                             <span className='inline-flex items-center rounded-lg px-3.5 py-2.5 font-normal text-[14px]/[20px] text-[#667085] bg-[#F2F4F7]'>
-                                                {task.status}
+                                                {TASK_STATUS_LABELS[task.status] ?? task.status}
                                             </span>
                                         ) : (
                                         <div onClick={(e) => e.stopPropagation()} className='relative w-36.5 rounded-lg border border-[#D0D5DD] bg-[#FFFFFF] shadow-[0_1px_2px_0_rgba(16,24,40,0.05)]'>
                                             <select
                                                 value={task.status}
-                                                onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                                                onChange={(e) =>
+                                                    readOnly
+                                                        ? handleStaffStatusChange(task.id, e.target.value)
+                                                        : handleStatusChange(task.id, e.target.value)
+                                                }
                                                 className='w-full appearance-none px-3.5 py-2.5 pr-9 rounded-lg outline-none font-normal text-[16px]/[24px] text-[#667085] bg-transparent cursor-pointer'
                                             >
                                                 {TASK_STATUS_OPTIONS.map((option) => (
                                                     <option key={option} value={option}>
-                                                        {option}
+                                                        {TASK_STATUS_LABELS[option] ?? option}
                                                     </option>
                                                 ))}
                                             </select>
@@ -156,6 +192,14 @@ function OverviewActiveTasksSection({ tasks = [], setTasks, onSeeAll, onNavigate
                     </table>
                 )}
             </div>
+
+            {proofTarget && (
+                <SubmitProofModal
+                    task={proofTarget}
+                    onCancel={() => setProofTarget(null)}
+                    onSubmit={handleSubmitProof}
+                />
+            )}
         </div>
     )
 }

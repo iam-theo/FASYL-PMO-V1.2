@@ -1,6 +1,7 @@
 import { FaEllipsisV, FaLock } from "react-icons/fa";
 import { useEffect, useState } from "react";
 import { api } from "../../api";
+import AuditLogPanel from "./AuditLogPanel";
 
 function ChevronIcon() {
   return (
@@ -689,6 +690,13 @@ function Dashboard({
           </div>
         )}
       </div>
+
+      {/* Activity audit trail (Head of Operations only) */}
+      {isHeadOfOps && (
+        <div className="mt-6">
+          <AuditLogPanel />
+        </div>
+      )}
     </div>
   );
 }
