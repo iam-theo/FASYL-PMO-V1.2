@@ -694,7 +694,7 @@ function Dashboard({
       {/* Activity audit trail (Head of Operations only) */}
       {isHeadOfOps && (
         <div className="mt-6">
-          <AuditLogPanel />
+          <AuditLogPanel onViewAll={() => setActiveTab("audit")} />
         </div>
       )}
     </div>

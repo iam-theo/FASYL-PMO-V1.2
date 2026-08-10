@@ -91,6 +91,41 @@ function ReportsIcon({ active }) {
   );
 }
 
+function AuditIcon({ active }) {
+  const color = active ? "#1B3C4A" : "#5B6470";
+  return (
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M9 6.5H7.8C6.11984 6.5 5.27976 6.5 4.63803 6.82698C4.07354 7.11457 3.61457 7.57354 3.32698 8.13803C3 8.77976 3 9.61984 3 11.3V16.2C3 17.8802 3 18.7202 3.32698 19.362C3.61457 19.9265 4.07354 20.3854 4.63803 20.673C5.27976 21 6.11984 21 7.8 21H12.2C13.8802 21 14.7202 21 15.362 20.673C15.9265 20.3854 16.3854 19.9265 16.673 19.362C17 18.7202 17 17.8802 17 16.2V15"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M7 16.2C7 14.5198 7 13.6798 7.32698 13.038C7.61457 12.4735 8.07354 12.0146 8.63803 11.727C9.27976 11.4 10.1198 11.4 11.8 11.4H16.2C17.8802 11.4 18.7202 11.4 19.362 11.727C19.9265 12.0146 20.3854 12.4735 20.673 13.038C21 13.6798 21 14.5198 21 16.2C21 17.8802 21 18.7202 20.673 19.362C20.3854 19.9265 19.9265 20.3854 19.362 20.673C18.7202 21 17.8802 21 16.2 21H11.8C10.1198 21 9.27976 21 8.63803 20.673C8.07354 20.3854 7.61457 19.9265 7.32698 19.362C7 18.7202 7 17.8802 7 16.2Z"
+        fill={color}
+        fillOpacity={active ? "0.16" : "0"}
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9 14H15M9 17.5H13"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function LogoutIcon() {
   return (
     <svg
@@ -185,12 +220,17 @@ function SideBar({
     ...(["HEADOFOPS", "PROJECTMANAGER"].includes(user?.role)
       ? [{ name: "reports", label: "Reports", path: "/app/reports" }]
       : []),
+    // The audit trail is a Head of Operations governance view.
+    ...(user?.role === "HEADOFOPS"
+      ? [{ name: "audit", label: "Audit Logs", path: "/app" }]
+      : []),
   ];
 
   const renderIcon = (name, isActive) => {
     if (name === "dashboard") return <DashboardIcon active={isActive} />;
     if (name === "projects") return <ProjectsIcon active={isActive} />;
     if (name === "reports") return <ReportsIcon active={isActive} />;
+    if (name === "audit") return <AuditIcon active={isActive} />;
     return null;
   };
 

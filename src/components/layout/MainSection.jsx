@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Dashboard from './Dashboard'
 import Projects from '../projects/Projects'
 import ProjectWorkspace from '../projects/tasks/ProjectWorkspace'
+import AuditLogsPage from './AuditLogsPage'
 
 function MainSection({
     activeTab,
@@ -102,6 +103,10 @@ function MainSection({
                     setOpenProject={setOpenProject}
                     setActiveSubTab={setActiveSubTab}
                 />
+            )}
+
+            {activeTab === "audit" && openProject === false && user?.role === "HEADOFOPS" && (
+                <AuditLogsPage user={user} />
             )}
 
             {openProject === true && selectedProject?.projectManager && (
