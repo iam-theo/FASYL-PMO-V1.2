@@ -121,7 +121,10 @@ export const getMyRemindersService = async (user) => {
     const reminders = await prisma.reminder.findMany({
         where: {
             userId: user.id,
-            status: "PENDING",
+            // A reminder stays "active" from the moment it becomes due until the
+            // user acts on it. SENT means the scheduler already delivered the
+            // notification — it must not disappear from the list at that point.
+            status: { in: ["PENDING", "SENT"] },
             remindAt: {
                 lte: now
             }

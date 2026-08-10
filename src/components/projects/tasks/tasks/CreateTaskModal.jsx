@@ -33,6 +33,7 @@ function CreateTaskModal({
         startDate: editValues?.startDate?.split("T")[0] ?? "",
         dueDate: editValues?.dueDate?.split("T")[0] ?? "",
         priority: editValues?.priority ?? "MEDIUM",
+        reminderDays: "3",
         assignedToUserId:
             userRole === "HEADOFOPS"
                 ? editValues?.assignee?.id ?? ""
@@ -128,6 +129,7 @@ function CreateTaskModal({
             startDate: form.startDate,
             dueDate: form.dueDate,
             priority: form.priority.toUpperCase(),
+            reminderDays: Number(form.reminderDays) || 3,
             document: selectedFile
         };
 
@@ -327,6 +329,27 @@ function CreateTaskModal({
                             <CalendarIcon className='pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2' />
                         </div>
                     </div>
+
+                    {!isEditing && (
+                        <div className='flex flex-col gap-1.5'>
+                            <label className='font-medium text-[14px]/[20px] text-[#090909]'>Reminder</label>
+                            <div className='relative rounded-lg border border-[#D0D5DD] bg-[#FFFFFF] shadow-[0_1px_2px_0_rgba(16,24,40,0.05)]'>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    max={60}
+                                    value={form.reminderDays}
+                                    onChange={(e) => handleChange("reminderDays", e.target.value)}
+                                    placeholder='3'
+                                    className='w-full px-3.5 py-2.5 pr-10 rounded-lg outline-none font-normal text-[16px]/[24px] text-[#090909] bg-transparent'
+                                />
+                                <span className='pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 font-normal text-[14px]/[20px] text-[#667085]'>days before due</span>
+                            </div>
+                            <p className='text-[12px]/[18px] text-[#636363]'>
+                                The assignee gets a reminder this many days before the due date. Defaults to 3.
+                            </p>
+                        </div>
+                    )}
 
                     <div className='flex flex-col gap-1.5'>
                         <label className='font-medium text-[14px]/[20px] text-[#090909]'>Priority Rating</label>

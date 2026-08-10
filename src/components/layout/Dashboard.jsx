@@ -1,6 +1,6 @@
 import { FaEllipsisV, FaLock } from "react-icons/fa";
 import { useEffect, useState, useCallback } from "react";
-import { api } from "../../api";
+import { api, getReminders, dismissReminder } from "../../api";
 import AuditLogPanel from "./AuditLogPanel";
 import { useRealtimeModule } from "../../realtimeData";
 
@@ -152,6 +152,26 @@ function CheckCircleStatIcon() {
   );
 }
 
+function ReminderIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9ZM13.73 21a2 2 0 0 1-3.46 0"
+        stroke="#B54708"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function BriefcaseIcon() {
   return (
     <svg
@@ -178,6 +198,24 @@ function BriefcaseIcon() {
       <path d="M2.5 12.5H21.5" stroke="#1B3C4A" strokeWidth="1.5" />
     </svg>
   );
+}
+
+function formatReminderDue(iso) {
+  if (!iso) return "—";
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "—";
+    const now = Date.now();
+    const diffMs = d.getTime() - now;
+    const mins = Math.round(diffMs / 60000);
+    if (mins < 0) return "Overdue";
+    if (mins < 60) return `In ${mins}m`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `In ${hours}h`;
+    return `In ${Math.floor(hours / 24)}d`;
+  } catch {
+    return "—";
+  }
 }
 
 function InboxIcon() {
@@ -299,6 +337,34 @@ function Dashboard({
   const safeProjects = Array.isArray(projects) ? projects : [];
 
   const [taskCount, setTaskCount] = useState(0);
+  const [reminders, setReminders] = useState([]);
+
+  // Active (fired but not dismissed/completed) reminders for the logged-in
+  // user. The scheduler broadcasts a realtime event when one fires, so this
+  // list appears live.
+  const loadReminders = useCallback(async () => {
+    try {
+      const response = await getReminders();
+      setReminders(Array.isArray(response.data) ? response.data : []);
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadReminders();
+  }, [loadReminders]);
+
+  useRealtimeModule("Reminders", loadReminders);
+
+  const handleDismissReminder = async (id) => {
+    try {
+      await dismissReminder(id);
+      setReminders((prev) => prev.filter((reminder) => reminder.id !== id));
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   // Count of tasks assigned to the logged-in user. The backend resolves the
   // assignment by role: PM/HOPS via assignedToUserId, STAFF via the project
@@ -522,6 +588,114 @@ function Dashboard({
           </div>
         </div>
       )}
+
+      {/* Active reminders */}
+      <div className="mt-6 overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+        <div className="flex flex-col gap-3 border-b border-line px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#FFFAEB] text-[#B54708]">
+              <ReminderIcon />
+            </span>
+            <div>
+              <h3 className="text-[15px]/[22px] font-semibold text-ink">
+                Active Reminders
+              </h3>
+              <p className="text-[13px]/[20px] text-ink-soft">
+                Reminders due for you right now
+              </p>
+            </div>
+          </div>
+          {reminders.length > 0 && (
+            <span className="inline-flex items-center rounded-full bg-[#FFF6ED] px-2.5 py-1 text-[12px]/[16px] font-medium text-[#C4320A]">
+              {reminders.length} active
+            </span>
+          )}
+        </div>
+
+        {reminders.length > 0 ? (
+          <div className="overflow-x-auto no-scrollbar">
+            <table className="w-full min-w-[760px] text-left">
+              <thead className="bg-line-soft/60">
+                <tr>
+                  <th className="px-5 py-3 text-[12px]/[18px] font-semibold uppercase tracking-wide text-ink-soft">
+                    Reminder
+                  </th>
+                  <th className="px-5 py-3 text-[12px]/[18px] font-semibold uppercase tracking-wide text-ink-soft">
+                    Task
+                  </th>
+                  <th className="px-5 py-3 text-[12px]/[18px] font-semibold uppercase tracking-wide text-ink-soft">
+                    Project
+                  </th>
+                  <th className="px-5 py-3 text-[12px]/[18px] font-semibold uppercase tracking-wide text-ink-soft">
+                    Due
+                  </th>
+                  <th className="px-5 py-3 text-right" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line-soft">
+                {reminders.map((reminder) => (
+                  <tr
+                    key={reminder.id}
+                    className="transition-colors hover:bg-line-soft/40"
+                  >
+                    <td className="px-5 py-4">
+                      <p className="text-[13px]/[20px] font-medium text-ink">
+                        {reminder.title}
+                      </p>
+                      {reminder.message && (
+                        <p className="max-w-[260px] truncate text-[12px]/[18px] text-ink-muted">
+                          {reminder.message}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-5 py-4">
+                      <p className="text-[13px]/[20px] text-ink-soft">
+                        {reminder.task?.title || "—"}
+                      </p>
+                    </td>
+                    <td className="px-5 py-4">
+                      <p
+                        title={reminder.project?.projectName}
+                        className="max-w-[200px] truncate text-[13px]/[20px] text-ink-soft"
+                      >
+                        {reminder.project?.projectName || "—"}
+                      </p>
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className="text-[13px]/[20px] font-medium text-[#C4320A]">
+                        {formatReminderDue(reminder.remindAt)}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleDismissReminder(reminder.id)}
+                        className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[13px]/[20px] font-medium text-primary transition-colors hover:border-primary/40 hover:bg-primary-soft cursor-pointer"
+                      >
+                        Dismiss
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-4 px-6 py-14 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-line-soft">
+              <ReminderIcon />
+            </div>
+            <div>
+              <h3 className="text-[15px]/[22px] font-semibold text-ink">
+                No active reminders
+              </h3>
+              <p className="mt-1 text-[13px]/[20px] text-ink-soft">
+                You're all caught up — new due reminders will appear here.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Active projects table */}
       <div className="mt-6 overflow-hidden rounded-2xl border border-line bg-surface shadow-card">

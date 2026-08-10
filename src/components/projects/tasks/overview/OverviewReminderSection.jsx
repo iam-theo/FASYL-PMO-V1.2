@@ -1,17 +1,18 @@
-import { getReminders } from "../../../../api"
+import { getReminders, dismissReminder } from "../../../../api"
 import { useState, useEffect, useCallback } from "react";
 import { useRealtimeModule } from "../../../../realtimeData";
 
 function OverviewReminderSection({ onNavigate }) {
 
     const [reminders, setReminders] = useState([]);
+    const [dismissingId, setDismissingId] = useState(null);
 
     const isClickable = typeof onNavigate === "function";
 
     const loadReminders = useCallback(async () => {
         try {
             const response = await getReminders();
-            setReminders(response.data);
+            setReminders(Array.isArray(response.data) ? response.data : []);
         } catch (err) {
             console.error(err);
         }
@@ -24,6 +25,20 @@ function OverviewReminderSection({ onNavigate }) {
     // Reminders appear/disappear as they're created or dismissed — keep the
     // section in sync with other users (and the scheduler).
     useRealtimeModule("Reminders", loadReminders);
+
+    const handleDismiss = async (id) => {
+        setDismissingId(id);
+        try {
+            await dismissReminder(id);
+            setReminders((prev) =>
+                Array.isArray(prev) ? prev.filter((r) => r.id !== id) : prev,
+            );
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setDismissingId(null);
+        }
+    };
 
     return (
         <div
@@ -60,7 +75,14 @@ function OverviewReminderSection({ onNavigate }) {
                                 <td className='h-18 px-6 font-normal text-[14px]/[20px] text-[#636363] whitespace-nowrap'>{reminder?.task?.dueDate}</td>
                                 {/* <td className='h-18 px-6 font-normal text-[14px]/[20px] text-[#636363] whitespace-nowrap'>{reminder.reminder}</td> */}
                                 <td className='h-18 px-6 font-normal text-[14px]/[20px] text-[#F5A200] whitespace-nowrap'>
-                                    <button>Dismiss</button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDismiss(reminder.id)}
+                                        disabled={dismissingId === reminder.id}
+                                        className='font-medium text-[14px]/[20px] text-[#1B3C4A] hover:text-[#228CEE] disabled:opacity-50 cursor-pointer'
+                                    >
+                                        {dismissingId === reminder.id ? "Dismissing…" : "Dismiss"}
+                                    </button>
                                 </td>
                             </tr>
                         ))}

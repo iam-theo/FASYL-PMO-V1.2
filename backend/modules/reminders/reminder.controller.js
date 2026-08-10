@@ -14,7 +14,7 @@ export const createReminder = async (
   project,
   stage,
   assigneeUserId,
-  daysBefore = 1
+  daysBefore = 3
 ) => {
 
   if (!task.dueDate) return null;

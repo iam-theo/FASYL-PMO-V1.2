@@ -32,7 +32,8 @@ export const createTaskService = async (body, user, document = null) => {
         description,
         priority,
         startDate,
-        dueDate
+        dueDate,
+        reminderDays
     } = body;
 
     const { id: loggedInUserId, role } = user;
@@ -176,16 +177,38 @@ export const createTaskService = async (body, user, document = null) => {
 
     });
 
-    // const reminderUserId = task.assignedToUserId ?? loggedInUserId;
-    // const remindAt = new Date(task.dueDate);
-    // remindAt.setDate(remindAt.getDate() -2);
+    // Resolve who the reminder targets: the assigned user when there is one,
+    // else a User account matching the assigned resource's email (project
+    // resources only carry an email), else the task creator as a fallback.
+    let reminderUserId = task.assignedToUserId;
+
+    if (!reminderUserId && task.assignedResourceId) {
+        const resource = projectResources.find(
+            (resource) => resource.recordId === task.assignedResourceId
+        );
+
+        if (resource?.email) {
+            const account = await prisma.user.findUnique({
+                where: { email: resource.email },
+                select: { id: true }
+            });
+
+            if (account) reminderUserId = account.id;
+        }
+    }
+
+    if (!reminderUserId) reminderUserId = loggedInUserId;
+
+    // The assigner chooses how many days before the due date the reminder
+    // fires; defaults to 3 when not provided.
+    const daysBefore = Math.max(0, Number(reminderDays ?? 3) || 0);
 
     await createReminder(
         task,
         project,
         stage,
-        task.assignedToUserId ?? loggedInUserId,
-        2
+        reminderUserId,
+        daysBefore
     );
 
     const assignee = task.assignedToUser

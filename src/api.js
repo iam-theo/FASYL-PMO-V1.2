@@ -297,6 +297,16 @@ export const getReminders = async () => {
   }
 };
 
+export const dismissReminder = async (id) => {
+  try {
+    const { data } = await api.post(`/reminders/${id}/dismiss`);
+
+    return data;
+  } catch (error) {
+    return normalizeError(error, "Reminder Dismiss Error");
+  }
+};
+
 export const getNotifications = async (options = {}) => {
   try {
     const { data } = await api.get("/notifications/my", options);

@@ -1,4 +1,7 @@
 import { PrismaClient } from "@prisma/client";
+import { createInAppNotification } from "../notifications/notification.service.js";
+import { broadcast } from "../realtime/realtime.service.js";
+import { sendEmail } from "../../utils/email.service.js";
 
 const prisma = new PrismaClient();
 
@@ -62,15 +65,51 @@ export const processDueReminders = async () => {
             );
             }
 
-            /**
-             * Future notification integrations:
-             *
-             * - In-app notification
-             * - Email
-             * - WhatsApp
-             * - Push notification
-             * - SMS
-             */
+            // Deliver the reminder to the user:
+            // 1. In-app notification (bell) — pushed live over the socket.
+            // 2. Realtime data-changed event so the active-reminders sections
+            //    on the dashboard / overview refresh instantly.
+            // 3. Best-effort email so they're reached even when offline.
+
+            await createInAppNotification({
+            userId: reminder.userId,
+            projectId: reminder.projectId,
+            type: "REMINDER",
+            title: `Reminder: ${reminder.title}`,
+            message: reminder.message || "A reminder you set is now due.",
+            data: {
+                projectId: reminder.projectId,
+                projectName: reminder.project?.projectName || null,
+                taskId: reminder.taskId,
+                taskTitle: reminder.task?.title || null,
+                stageName: reminder.stage?.stageName || null,
+            },
+            });
+
+            broadcast("data:changed", {
+            module: "Reminders",
+            action: "Reminder triggered",
+            projectId: reminder.projectId ?? null,
+            userId: reminder.userId,
+            });
+
+            await sendEmail({
+            to: reminder.user.email,
+            subject: `Reminder: ${reminder.title}`,
+            text: `${reminder.message ? `${reminder.message}\n\n` : ""}Due: ${
+                reminder.remindAt?.toLocaleString() ?? "—"
+            }\nThis is an automated message from the FASYL PMO portal.`,
+            html: `<p>${
+                (reminder.message || "A reminder you set is now due.").replaceAll(
+                "&",
+                "&amp;"
+                ).replaceAll("<", "&lt;")
+            }</p>
+                <p><strong>Due:</strong> ${
+                reminder.remindAt?.toLocaleString() ?? "—"
+                }</p>
+                <p style="color:#98a2b3;font-size:13px;">This is an automated message from the FASYL PMO portal.</p>`,
+            });
 
             await prisma.reminder.update({
             where: {
