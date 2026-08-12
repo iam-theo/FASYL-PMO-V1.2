@@ -49,11 +49,11 @@ export const syncProjects = async (projects) => {
         const mapped = mapSalesToPMOProject(p);
 
         const existing = await prisma.project.findUnique({
-            where: { externalId: mapped.externalId },
+            where: { projectId: mapped.externalId },
         });
 
         const project = await prisma.project.upsert({
-        where: { externalId: mapped.externalId },
+            where: { projectId: mapped.externalId },
 
             update: {
                 ...mapped,
