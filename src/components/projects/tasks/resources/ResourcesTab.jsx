@@ -112,16 +112,38 @@ function ResourcesTab({ project, onProjectUpdate, canManageResources = false }) 
 
       <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-4 py-4">
         {resources.length === 0 ? (
-          <div className="w-full py-20 text-center font-normal text-[14px]/[20px] text-[#636363]">
-            No resources assigned to this project yet.
-            {canManageResources && " Use the Add Resource button to add one."}
+          <div className="flex h-full w-full flex-col items-center justify-center gap-5 py-16">
+            <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1B3C4A] to-[#2E6B7E] text-[#FFFFFF] shadow-card-hover">
+              <i className="fa-solid fa-users text-[22px]"></i>
+            </span>
+            <div className="text-center">
+              <h3 className="text-[16px]/[24px] font-semibold text-ink">
+                No resources assigned yet
+              </h3>
+              <p className="mt-1 text-[13px]/[20px] text-ink-muted">
+                {canManageResources
+                  ? "Add staff from the directory to get this project moving."
+                  : "This project has no resources assigned yet."}
+              </p>
+            </div>
+            {canManageResources && (
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(true)}
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#1B3C4A] px-4 font-medium text-[13px]/[20px] text-[#FFFFFF] cursor-pointer hover:bg-[#16313D]"
+              >
+                <i className="fa-solid fa-plus text-[#FFFFFF]"></i>
+                Add Resource
+              </button>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {paginatedResources.map((resource) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            {paginatedResources.map((resource, index) => (
               <ResourceCard
                 key={resource.recordId}
                 resource={resource}
+                index={index}
                 onRemove={canManageResources ? setResourceToRemove : undefined}
               />
             ))}
