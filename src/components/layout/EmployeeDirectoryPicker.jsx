@@ -6,7 +6,7 @@ import { avatarGradientFor, initialsFor } from "../../utils/avatar";
  * Picking an employee auto-fills the account form. Supports type-to-filter,
  * arrow-key navigation, and Enter/Escape.
  */
-function EmployeeDirectoryPicker({ employees, loading, value, onSelect }) {
+function EmployeeDirectoryPicker({ employees, loading, value, onSelect, emptyMessage }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [highlightIndex, setHighlightIndex] = useState(0);
@@ -214,10 +214,12 @@ function EmployeeDirectoryPicker({ employees, loading, value, onSelect }) {
                   <i className="fa-solid fa-user-slash text-[16px] text-ink-muted"></i>
                 </span>
                 <p className="text-[13px]/[18px] font-medium text-ink">
-                  No employees match “{query}”
+                  {emptyMessage || `No employees match “${query}”`}
                 </p>
                 <p className="text-[11px]/[16px] text-ink-muted">
-                  Try a different name, email, or staff ID.
+                  {emptyMessage
+                    ? "Their details can still be entered manually in the form below."
+                    : "Try a different name, email, or staff ID."}
                 </p>
               </div>
             ) : (
