@@ -3,7 +3,9 @@ import { useMemo, useState } from "react";
 import ResourceCard from "./ResourceCard";
 import ExportMenu from "../ExportMenu";
 import AddResourceModal from "./AddResourceModal";
-// import RemoveResourceModal from './RemoveResourceModal'
+import RemoveResourceModal from "./RemoveResourceModal";
+import { removeProjectResource, api } from "../../../../api";
+import { useNotification } from "../../../NotificationContext";
 
 const ITEMS_PER_PAGE = 6;
 
@@ -20,7 +22,9 @@ function ResourcesTab({ project, onProjectUpdate, canManageResources = false }) 
 
   const [currentPage, setCurrentPage] = useState(1);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
-  // const [resourceToRemove, setResourceToRemove] = useState(null)
+  const [resourceToRemove, setResourceToRemove] = useState(null)
+  const [removing, setRemoving] = useState(false)
+  const { showNotification } = useNotification()
 
   const resources = useMemo(() => project?.resources || [], [project?.resources]);
 
@@ -33,6 +37,42 @@ function ResourcesTab({ project, onProjectUpdate, canManageResources = false }) 
 
   const handleResourceAdded = (updatedProject) => {
     onProjectUpdate?.(updatedProject);
+  };
+
+  const handleRemoveResource = async (resource) => {
+    if (removing) return;
+
+    try {
+      setRemoving(true);
+      const response = await removeProjectResource(project.id, resource.recordId);
+
+      let freshProject = response.data;
+
+      try {
+        const freshResponse = await api.get(`/projects/${project.projectId}`);
+        freshProject = freshResponse.data?.data ?? freshProject;
+      } catch (refetchErr) {
+        console.error(refetchErr);
+      }
+
+      setResourceToRemove(null);
+      onProjectUpdate?.(freshProject);
+
+      showNotification({
+        type: "success",
+        title: "Resource Removed!",
+        message: `${resource.firstName} ${resource.lastName} has been removed from ${project.projectName ?? "the project"}`
+      });
+    } catch (error) {
+      console.error(error);
+      showNotification({
+        type: "error",
+        title: "Failed To Remove Resource!",
+        message: error.response?.data?.error || "Unable to remove resource"
+      });
+    } finally {
+      setRemoving(false);
+    }
   };
 
   return (
@@ -82,7 +122,7 @@ function ResourcesTab({ project, onProjectUpdate, canManageResources = false }) 
               <ResourceCard
                 key={resource.recordId}
                 resource={resource}
-                // onRemove={setResourceToRemove}
+                onRemove={canManageResources ? setResourceToRemove : undefined}
               />
             ))}
           </div>
@@ -113,19 +153,20 @@ function ResourcesTab({ project, onProjectUpdate, canManageResources = false }) 
         </div>
       </div>
 
-      {/* {resourceToRemove && (
+      {resourceToRemove && (
                 <RemoveResourceModal
                     resource={resourceToRemove}
                     onCancel={() => setResourceToRemove(null)}
                     onConfirm={handleRemoveResource}
                 />
-            )} */}
+            )}
 
             {isAddModalOpen && (
                 <AddResourceModal
                     projectId={project.id}
                     projectCode={project.projectId}
                     projectName={project.projectName}
+                    existingEmails={(project.resources || []).map((r) => r.email)}
                     onClose={() => setIsAddModalOpen(false)}
                     onAdded={handleResourceAdded}
                 />

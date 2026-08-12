@@ -82,6 +82,11 @@ function MainSection({
                     setSelectedProject={setSelectedProject}
                     setOpenProject={setOpenProject}
                     setActiveSubTab={setActiveSubTab}
+                    onOpenProjectsWithFilter={(status) => {
+                        setFilter(status || "all");
+                        setCurrentPage(1);
+                        setActiveTab("projects");
+                    }}
                 />
             )}
 

@@ -428,7 +428,9 @@ export const notifyStageSignoffReviewed = async ({
       title,
       message: approved
         ? `"${stageName}" was approved for ${projectName}.`
-        : `"${stageName}" was rejected for ${projectName}.`,
+        : `"${stageName}" was rejected for ${projectName}.${
+            reason ? ` Reason: ${reason}` : ""
+          }`,
       data: {
         projectId: project.projectId,
         projectName,
@@ -459,6 +461,127 @@ export const notifyStageSignoffReviewed = async ({
     });
   } catch (error) {
     console.error("❌ Signoff review notification failed:", error.message);
+  }
+};
+
+/**
+ * Emails a project manager that they have been unassigned from a project
+ * (e.g. reassigned to someone else), and creates an in-app notification for
+ * them. Never throws.
+ */
+export const notifyProjectUnassigned = async ({
+  project,
+  projectManager,
+  unassignedBy,
+}) => {
+  try {
+    if (!projectManager?.email) return;
+
+    const unassignerName =
+      unassignedBy?.fullName || unassignedBy?.email || "The operations team";
+
+    const detailsRows = [
+      ["Project", project.projectName],
+      ["Client", project.clientName || "—"],
+      ["Project ID", project.projectId || "—"],
+    ];
+
+    const title = "You have been unassigned from a project";
+    const greeting = `Hi ${formatAssigneeName(projectManager)},`;
+    const intro = `${unassignerName} removed you as the project manager for ${project.projectName} in the FASYL PMO portal.`;
+
+    const userId = await findUserIdForAssignee(projectManager);
+
+    if (userId) {
+      await createInAppNotification({
+        userId,
+        projectId: project.projectId || null,
+        type: "PROJECT_UNASSIGNED",
+        title,
+        message: `${unassignerName} unassigned you from ${project.projectName}.`,
+        data: {
+          projectId: project.projectId || null,
+          projectName: project.projectName,
+        },
+      });
+    }
+
+    await sendEmail({
+      to: projectManager.email,
+      subject: `[FASYL PMO] You have been unassigned: ${project.projectName}`,
+      text: toPlainText({ title, greeting, intro, detailsRows }),
+      html: buildLayout({
+        title,
+        greeting,
+        intro,
+        detailsRows,
+        buttonLabel: "Open portal",
+        buttonUrl: APP_BASE_URL,
+      }),
+    });
+  } catch (error) {
+    console.error("❌ Project unassignment notification failed:", error.message);
+  }
+};
+
+/**
+ * Emails a staff member that they were added as a resource to a project, and
+ * creates an in-app notification when the resource maps to a User account.
+ * Never throws.
+ */
+export const notifyResourceAssigned = async ({
+  project,
+  resource,
+  assignedBy,
+}) => {
+  try {
+    if (!resource?.email) return;
+
+    const assignerName =
+      assignedBy?.fullName || assignedBy?.email || "The project manager";
+
+    const detailsRows = [
+      ["Project", project.projectName],
+      ["Client", project.clientName || "—"],
+      ["Project ID", project.projectId || "—"],
+      ["Designation", resource.designation || "—"],
+    ];
+
+    const title = "You have been added to a project";
+    const greeting = `Hi ${formatAssigneeName(resource)},`;
+    const intro = `${assignerName} added you as a resource on ${project.projectName} in the FASYL PMO portal.`;
+
+    const userId = await findUserIdForAssignee(resource);
+
+    if (userId) {
+      await createInAppNotification({
+        userId,
+        projectId: project.projectId || null,
+        type: "RESOURCE_ASSIGNED",
+        title,
+        message: `${assignerName} added you as a resource on ${project.projectName}.`,
+        data: {
+          projectId: project.projectId || null,
+          projectName: project.projectName,
+        },
+      });
+    }
+
+    await sendEmail({
+      to: resource.email,
+      subject: `[FASYL PMO] You have been added to a project: ${project.projectName}`,
+      text: toPlainText({ title, greeting, intro, detailsRows }),
+      html: buildLayout({
+        title,
+        greeting,
+        intro,
+        detailsRows,
+        buttonLabel: "Open project",
+        buttonUrl: APP_BASE_URL,
+      }),
+    });
+  } catch (error) {
+    console.error("❌ Resource assignment notification failed:", error.message);
   }
 };
 

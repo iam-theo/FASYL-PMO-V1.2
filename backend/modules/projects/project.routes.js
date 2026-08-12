@@ -13,7 +13,8 @@ import {
    updateChecklistBulk,
    uploadStageDocument,
    deleteStageDocument,
-   addProjectResource
+   addProjectResource,
+   removeProjectResource
 } from "./project.controller.js";
 
 import { uploadLimiter, writeLimiter } from "../../middleware/rateLimit.middleware.js";
@@ -237,8 +238,54 @@ router.patch(
    "/:projectId/resources",
    authMiddleWare,
    writeLimiter,
-   allowRoles(ROLES.PROJECTMANAGER, ROLES.HEADOFOPS),
+   allowRoles(ROLES.PROJECTMANAGER),
    addProjectResource
+);
+
+/* =========================================
+   REMOVE RESOURCE FROM PROJECT
+========================================= */
+/**
+ * @swagger
+ * /projects/{projectId}/resources/{recordId}:
+ *   delete:
+ *     summary: Remove a resource from a project
+ *     description: Removes a resource (by recordId) from the project's resources list.
+ *     tags:
+ *       - Projects
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: projectId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 69
+ *       - name: recordId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: MAN-1720000000000
+ *     responses:
+ *       200:
+ *         description: Resource removed successfully
+ *       400:
+ *         description: Resource not found on this project
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden (assigned Project Manager only)
+ *       404:
+ *         description: Project not found
+ */
+router.delete(
+   "/:projectId/resources/:recordId",
+   authMiddleWare,
+   writeLimiter,
+   allowRoles(ROLES.PROJECTMANAGER),
+   removeProjectResource
 );
 
 /* =========================================

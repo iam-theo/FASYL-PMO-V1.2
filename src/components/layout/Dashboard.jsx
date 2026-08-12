@@ -333,6 +333,7 @@ function Dashboard({
   setSelectedProject,
   setOpenProject,
   setActiveSubTab,
+  onOpenProjectsWithFilter,
 }) {
   const safeProjects = Array.isArray(projects) ? projects : [];
 
@@ -476,7 +477,11 @@ function Dashboard({
               icon={<UsersStatIcon />}
               chipClass="bg-[#EFF8FF]"
               footerClass="text-primary"
-              onClick={() => setActiveTab("projects")}
+              onClick={() =>
+                onOpenProjectsWithFilter
+                  ? onOpenProjectsWithFilter("all")
+                  : setActiveTab("projects")
+              }
             />
             <MetricCard
               label="In Progress"
@@ -485,6 +490,7 @@ function Dashboard({
               icon={<ScheduleStatIcon />}
               chipClass="bg-[#EAF9F1]"
               footerClass="text-ink-muted"
+              onClick={() => onOpenProjectsWithFilter?.("approved")}
             />
             <MetricCard
               label="Awaiting Approval"
@@ -493,6 +499,7 @@ function Dashboard({
               icon={<ClockStatIcon />}
               chipClass="bg-[#FFFAEB]"
               footerClass="text-ink-muted"
+              onClick={() => onOpenProjectsWithFilter?.("submitted")}
             />
             <MetricCard
               label="Completed"
@@ -501,6 +508,7 @@ function Dashboard({
               icon={<CheckCircleStatIcon />}
               chipClass="bg-[#ECFDF3]"
               footerClass="text-ink-muted"
+              onClick={() => onOpenProjectsWithFilter?.("completed")}
             />
           </div>
 
