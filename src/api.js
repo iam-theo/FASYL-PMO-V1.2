@@ -123,6 +123,26 @@ export const addProjectResource = async (projectId, resource) => {
   }
 };
 
+export const removeProjectResource = async (projectId, recordId) => {
+  try {
+    const { data } = await api.delete(`/projects/${projectId}/resources/${recordId}`);
+
+    return data;
+  } catch (error) {
+    return normalizeError(error, "Remove Resource Error");
+  }
+};
+
+export const getStaff = async () => {
+  try {
+    const { data } = await api.get("/auth/staff");
+
+    return data;
+  } catch (error) {
+    return normalizeError(error, "Staff Retrieval Error");
+  }
+};
+
 export const handleChecklist = async (projectId, stageId, updatedChecklist) => {
   try {
     const { data } = await api.patch(

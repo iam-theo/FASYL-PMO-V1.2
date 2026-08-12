@@ -4,6 +4,7 @@ import {
   refreshTokenService,
   logoutUser,
   getProjectManagersService,
+  getStaffService,
   signupUser,
 } from "./auth.service.js";
 
@@ -143,6 +144,27 @@ export const getProjectManagers = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch project managers",
+      error: err.message,
+    });
+  }
+};
+
+// GET STAFF USERS
+
+export const getStaff = async (req, res) => {
+  try {
+    const users = await getStaffService();
+
+    return res.status(200).json({
+      success: true,
+      message: "Staff retrieved successfully",
+      data: users,
+    });
+
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch staff",
       error: err.message,
     });
   }

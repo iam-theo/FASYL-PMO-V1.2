@@ -5,6 +5,7 @@ import {
   refresh,
   logout,
   getProjectManagers,
+  getStaff,
   signup,
 } from "./auth.controller.js";
 
@@ -221,6 +222,24 @@ router.post("/logout", logout);
 router.get(
   "/project-managers",
   getProjectManagers
+);
+
+/**
+ * @swagger
+ * /auth/staff:
+ *   get:
+ *     summary: Get all staff users
+ *     description: Returns all users with the STAFF role, used to populate the resource selection dropdown.
+ *     tags: [Authentication]
+ *     responses:
+ *       200:
+ *         description: Staff retrieved successfully
+ *       500:
+ *         description: Server error
+ */
+router.get(
+  "/staff",
+  getStaff
 );
 
 export default router;

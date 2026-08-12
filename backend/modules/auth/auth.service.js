@@ -170,3 +170,23 @@ export const getProjectManagersService = async () => {
     },
   });
 };
+
+// GET STAFF USERS
+
+export const getStaffService = async () => {
+  return await prisma.user.findMany({
+    where: {
+      role: "STAFF",
+    },
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      role: true,
+      createdAt: true,
+    },
+    orderBy: {
+      fullName: "asc",
+    },
+  });
+};

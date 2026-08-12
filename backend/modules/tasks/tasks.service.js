@@ -43,6 +43,28 @@ export const createTaskService = async (body, user, document = null) => {
 
     if (!projectId || !title) throw new Error("Project ID and title are required");
 
+    // A task must always carry a priority and a start/end date — a task without
+    // a schedule or urgency is not actionable.
+    const ALLOWED_PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"];
+    const normalizedPriority = String(priority || "").toUpperCase();
+
+    if (!normalizedPriority) {
+        throw new Error("Priority is required");
+    }
+
+    if (!ALLOWED_PRIORITIES.includes(normalizedPriority)) {
+        throw new Error(
+            `Priority must be one of: ${ALLOWED_PRIORITIES.join(", ")}`
+        );
+    }
+
+    if (!startDate) throw new Error("Start date is required");
+    if (!dueDate) throw new Error("Due date is required");
+
+    if (new Date(dueDate) < new Date(startDate)) {
+        throw new Error("Due date cannot be before the start date");
+    }
+
     const project = await prisma.project.findUnique({
         where: {
             projectId
@@ -119,11 +141,11 @@ export const createTaskService = async (body, user, document = null) => {
 
             title,
             description,
-            priority: priority || "MEDIUM",
+            priority: normalizedPriority,
 
-            startDate: startDate ? new Date(startDate) : null,
+            startDate: new Date(startDate),
 
-            dueDate: dueDate ? new Date(dueDate) : null,
+            dueDate: new Date(dueDate),
 
             assignedById: loggedInUserId,
             createdById: loggedInUserId,
@@ -536,6 +558,23 @@ export const updateTaskService = async (
 
     const previousAssignedToUserId = task.assignedToUserId;
     const previousAssignedResourceId = task.assignedResourceId;
+
+    // The required task fields may be updated but never cleared.
+    if (body.priority !== undefined && !String(body.priority).trim()) {
+        throw new Error("Priority is required");
+    }
+
+    if (body.startDate !== undefined && !body.startDate) {
+        throw new Error("Start date is required");
+    }
+
+    if (body.dueDate !== undefined && !body.dueDate) {
+        throw new Error("Due date is required");
+    }
+
+    if (body.startDate && body.dueDate && new Date(body.dueDate) < new Date(body.startDate)) {
+        throw new Error("Due date cannot be before the start date");
+    }
 
     let allowedBody = body;
 

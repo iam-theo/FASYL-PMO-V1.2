@@ -97,6 +97,8 @@ function CreateTaskModal({
     //     });
     // }, [isEditing, editValues, userRole]);
 
+    const [validationError, setValidationError] = useState("");
+
     const handleChange = (field, value) => {
         setForm((prev) => ({
             ...prev,
@@ -105,19 +107,53 @@ function CreateTaskModal({
     };
 
 
+    // A task is only actionable with a schedule and an urgency level.
+    const validateForm = () => {
+        if (form.title.trim().length === 0) {
+            return "Task title is required";
+        }
+
+        if (userRole === "HEADOFOPS" && !form.assignedToUserId) {
+            return "A project manager must be selected";
+        }
+
+        if (userRole === "PROJECTMANAGER" && !form.assignedResourceId) {
+            return "A resource must be selected";
+        }
+
+        if (!form.startDate) {
+            return "Start date is required";
+        }
+
+        if (!form.dueDate) {
+            return "Due date is required";
+        }
+
+        if (form.dueDate < form.startDate) {
+            return "Due date cannot be before the start date";
+        }
+
+        if (!form.priority) {
+            return "Priority is required";
+        }
+
+        return "";
+    };
+
     const isValid = form.title.trim().length > 0 && (
         (userRole === "HEADOFOPS" && form.assignedToUserId) ||
         (userRole === "PROJECTMANAGER" && form.assignedResourceId)
-    );
+    ) && Boolean(form.startDate) && Boolean(form.dueDate) && Boolean(form.priority);
 
     const handleCreate = async () => {
 
-        // console.log({
-        //     userRole,
-        //     assignedToUserId: form.assignedToUserId,
-        //     assignedResourceId: form.assignedResourceId,
-        //     isValid
-        // });
+        const error = validateForm();
+        if (error) {
+            setValidationError(error);
+            return;
+        }
+
+        setValidationError("");
 
         if (!isValid) return
 
@@ -147,12 +183,13 @@ function CreateTaskModal({
 
     const handleEdit = async () => {
 
-        // console.log({
-        //     userRole,
-        //     assignedToUserId,
-        //     assignedResourceId,
-        //     isValid
-        // });
+        const error = validateForm();
+        if (error) {
+            setValidationError(error);
+            return;
+        }
+
+        setValidationError("");
 
         if (!isValid) return
 
@@ -367,6 +404,12 @@ function CreateTaskModal({
                         </div>
                     </div>
                 </div>
+
+                {validationError && (
+                    <p className='rounded-lg border border-[#D92D20] bg-[#FEF3F2] px-3.5 py-2.5 text-[13px]/[18px] font-medium text-[#B42318]'>
+                        {validationError}
+                    </p>
+                )}
 
                 <button
                     type="button"

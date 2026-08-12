@@ -1,8 +1,8 @@
-import { useState } from 'react'
-import { addProjectResource, api } from '../../../../api'
+import { useEffect, useMemo, useState } from 'react'
+import { addProjectResource, api, getStaff } from '../../../../api'
 import { useNotification } from '../../../NotificationContext'
 
-function AddResourceModal({ projectId, projectCode, projectName, onClose, onAdded }) {
+function AddResourceModal({ projectId, projectCode, projectName, existingEmails = [], onClose, onAdded }) {
 
     const [form, setForm] = useState({
         firstName: "",
@@ -13,7 +13,55 @@ function AddResourceModal({ projectId, projectCode, projectName, onClose, onAdde
         designation: "",
     })
     const [loading, setLoading] = useState(false)
+    const [staff, setStaff] = useState([])
+    const [staffLoading, setStaffLoading] = useState(true)
     const { showNotification } = useNotification()
+
+    // Staff accounts already exist in the system — surface them so the PM can
+    // pick instead of typing out contact details by hand.
+    useEffect(() => {
+        let mounted = true;
+
+        const loadStaff = async () => {
+            try {
+                const response = await getStaff();
+                if (mounted) setStaff(Array.isArray(response.data) ? response.data : []);
+            } catch (error) {
+                console.error(error);
+            } finally {
+                if (mounted) setStaffLoading(false);
+            }
+        };
+
+        loadStaff();
+        return () => { mounted = false; };
+    }, []);
+
+    const availableStaff = useMemo(() => {
+        const existing = new Set(
+            existingEmails.map((email) => String(email || "").trim().toLowerCase())
+        );
+
+        return staff.filter(
+            (member) => !existing.has(String(member.email || "").trim().toLowerCase())
+        );
+    }, [staff, existingEmails]);
+
+    const handleSelectStaff = (id) => {
+        const member = staff.find((s) => String(s.id) === String(id));
+        if (!member) return;
+
+        const parts = String(member.fullName || "").trim().split(/\s+/);
+        const firstName = parts[0] || "";
+        const lastName = parts.slice(1).join(" ");
+
+        setForm((prev) => ({
+            ...prev,
+            firstName,
+            lastName,
+            email: member.email || "",
+        }));
+    };
 
     const handleChange = (e) => {
         setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
@@ -93,11 +141,35 @@ function AddResourceModal({ projectId, projectCode, projectName, onClose, onAdde
 
                 <div className='rounded-lg border border-[#0000000D] bg-[#F3F3F3] p-4'>
                     <p className='font-normal text-[13px]/[20px] text-[#636363]'>
-                        Resource not listed? Capture the details below to add them to <span className='font-medium text-[#1B3C4A]'>{projectName ?? "this project"}</span>. They will be available for task assignments.
+                        Pick an existing staff member from the system — their details are filled in automatically. If they are not listed, capture the details below to add them to <span className='font-medium text-[#1B3C4A]'>{projectName ?? "this project"}</span>.
                     </p>
                 </div>
 
                 <form className='flex flex-col gap-4' onSubmit={handleSubmit}>
+                    <div className='flex flex-col gap-1.5'>
+                        <label className={labelClass}>Select existing staff</label>
+                        <select
+                            value=""
+                            onChange={(e) => handleSelectStaff(e.target.value)}
+                            className={inputClass}
+                            disabled={staffLoading}
+                        >
+                            <option value="">
+                                {staffLoading
+                                    ? "Loading staff..."
+                                    : availableStaff.length === 0
+                                        ? staff.length === 0
+                                            ? "No staff accounts found in the system"
+                                            : "All staff are already on this project"
+                                        : "Select a staff member"}
+                            </option>
+                            {availableStaff.map((member) => (
+                                <option key={member.id} value={member.id}>
+                                    {member.fullName} — {member.email}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                     <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
                         <div className='flex flex-col gap-1.5'>
                             <label className={labelClass}>First name <span className='text-[#B42318]'>*</span></label>

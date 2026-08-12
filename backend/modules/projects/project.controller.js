@@ -8,8 +8,13 @@ import {
   uploadStageDocumentService,
   deleteStageDocumentService,
   addResourceToProjectService,
+  removeResourceFromProjectService,
 } from "./project.service.js";
-import { notifyProjectAssignment } from "../notifications/notification.service.js";
+import {
+  notifyProjectAssignment,
+  notifyProjectUnassigned,
+  notifyResourceAssigned,
+} from "../notifications/notification.service.js";
 import { storeUploadedFile } from "../../utils/upload.service.js";
 
 /* =========================================
@@ -85,7 +90,7 @@ export const assignProject = async (req, res) => {
       });
     }
 
-    const project = await assignProjectService(
+    const { project, previousManager } = await assignProjectService(
       Number(projectId),
       projectManagerEmail,
     );
@@ -97,6 +102,18 @@ export const assignProject = async (req, res) => {
         assignedBy: req.user,
       }).catch((error) => {
         console.error("Project assignment notification failed:", error.message);
+      });
+    }
+
+    // The outgoing manager should learn they have been unassigned — this
+    // covers reassignment (and any future explicit unassign flow).
+    if (previousManager?.email) {
+      notifyProjectUnassigned({
+        project,
+        projectManager: previousManager,
+        unassignedBy: req.user,
+      }).catch((error) => {
+        console.error("Project unassignment notification failed:", error.message);
       });
     }
 
@@ -121,7 +138,22 @@ export const addProjectResource = async (req, res) => {
   try {
     const { projectId } = req.params;
 
-    const project = await addResourceToProjectService(projectId, req.body);
+    const project = await addResourceToProjectService(
+      projectId,
+      req.body,
+      req.user,
+    );
+
+    // Let the added staff member know they are now on this project.
+    if (req.body?.email) {
+      notifyResourceAssigned({
+        project,
+        resource: req.body,
+        assignedBy: req.user,
+      }).catch((error) => {
+        console.error("Resource assignment notification failed:", error.message);
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -132,6 +164,33 @@ export const addProjectResource = async (req, res) => {
     return res.status(400).json({
       success: false,
       message: "Failed to add resource",
+      error: err.message,
+    });
+  }
+};
+
+/* =========================================
+    REMOVE RESOURCE FROM PROJECT
+========================================= */
+export const removeProjectResource = async (req, res) => {
+  try {
+    const { projectId, recordId } = req.params;
+
+    const project = await removeResourceFromProjectService(
+      projectId,
+      recordId,
+      req.user,
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Resource removed successfully",
+      data: project,
+    });
+  } catch (err) {
+    return res.status(400).json({
+      success: false,
+      message: "Failed to remove resource",
       error: err.message,
     });
   }
