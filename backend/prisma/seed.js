@@ -13,19 +13,33 @@ async function main() {
                 email: "admin@test.com",
                 password: hashedAdminPassword,
                 fullName: "Admin User",
-                role: "HEADOFOPS"
+                role: "HEADOFOPS",
+                mustChangePassword: true
             },
             {
                 email: "user@test.com",
                 password: hashedPMPassword,
                 fullName: "PM User",
-                role: "PROJECTMANAGER"
+                role: "PROJECTMANAGER",
+                mustChangePassword: true
             }
         ],
         skipDuplicates: true
     });
 
-    console.log("✅ Seeded successfully");
+    // Seeded/test credentials should always be forced to change on first
+    // login, even when the rows already exist (e.g. created before the
+    // mustChangePassword column existed).
+    const updated = await prisma.user.updateMany({
+        where: {
+            email: {
+                in: ["admin@test.com", "user@test.com", "coo@fasylng.com"],
+            },
+        },
+        data: { mustChangePassword: true },
+    });
+
+    console.log(`✅ Seeded successfully (${updated.count} seeded accounts flagged for password change)`);
 }
 
 main()

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { addProjectResource, api, getStaff } from '../../../../api'
+import { addProjectResource, api, getEmployees, getStaff } from '../../../../api'
 import { useNotification } from '../../../NotificationContext'
 
 function AddResourceModal({ projectId, projectCode, projectName, existingEmails = [], onClose, onAdded }) {
@@ -11,55 +11,101 @@ function AddResourceModal({ projectId, projectCode, projectName, existingEmails 
         phoneNumber: "",
         staffId: "",
         designation: "",
+        password: "",
     })
     const [loading, setLoading] = useState(false)
-    const [staff, setStaff] = useState([])
-    const [staffLoading, setStaffLoading] = useState(true)
+    const [employees, setEmployees] = useState([])
+    const [employeesLoading, setEmployeesLoading] = useState(true)
+    const [registeredEmails, setRegisteredEmails] = useState([])
+    const [selectedEmployee, setSelectedEmployee] = useState(null)
     const { showNotification } = useNotification()
 
-    // Staff accounts already exist in the system — surface them so the PM can
-    // pick instead of typing out contact details by hand.
+    // Two sources load in parallel:
+    // - XNETT employee directory: the authoritative "resources already in the
+    //   system" list the PM picks from.
+    // - Registered STAFF accounts: used to decide whether the picked employee
+    //   already has a login (no password field / no account creation) or needs
+    //   an account created on the fly (password field shows).
     useEffect(() => {
         let mounted = true;
 
-        const loadStaff = async () => {
+        const load = async () => {
             try {
-                const response = await getStaff();
-                if (mounted) setStaff(Array.isArray(response.data) ? response.data : []);
-            } catch (error) {
-                console.error(error);
+                const [employeesRes, staffRes] = await Promise.allSettled([
+                    getEmployees(),
+                    getStaff(),
+                ]);
+
+                if (mounted) {
+                    if (employeesRes.status === "fulfilled") {
+                        setEmployees(Array.isArray(employeesRes.value?.data) ? employeesRes.value.data : []);
+                    } else {
+                        console.error(employeesRes.reason);
+                    }
+
+                    if (staffRes.status === "fulfilled") {
+                        const staff = Array.isArray(staffRes.value?.data) ? staffRes.value.data : [];
+                        setRegisteredEmails(
+                            staff
+                                .map((member) => String(member.email || "").trim().toLowerCase())
+                                .filter(Boolean)
+                        );
+                    } else {
+                        console.error(staffRes.reason);
+                    }
+                }
             } finally {
-                if (mounted) setStaffLoading(false);
+                if (mounted) setEmployeesLoading(false);
             }
         };
 
-        loadStaff();
+        load();
         return () => { mounted = false; };
     }, []);
 
-    const availableStaff = useMemo(() => {
+    const availableEmployees = useMemo(() => {
         const existing = new Set(
             existingEmails.map((email) => String(email || "").trim().toLowerCase())
         );
 
-        return staff.filter(
-            (member) => !existing.has(String(member.email || "").trim().toLowerCase())
+        return employees.filter(
+            (emp) => !existing.has(String(emp.email || "").trim().toLowerCase())
         );
-    }, [staff, existingEmails]);
+    }, [employees, existingEmails]);
 
-    const handleSelectStaff = (id) => {
-        const member = staff.find((s) => String(s.id) === String(id));
-        if (!member) return;
+    const registeredEmailSet = useMemo(
+        () => new Set(registeredEmails),
+        [registeredEmails]
+    );
 
-        const parts = String(member.fullName || "").trim().split(/\s+/);
-        const firstName = parts[0] || "";
-        const lastName = parts.slice(1).join(" ");
+    // The picked employee's email decides whether an account already exists.
+    const selectedHasAccount = useMemo(() => {
+        const email = String(form.email || "").trim().toLowerCase();
+        return Boolean(email && registeredEmailSet.has(email));
+    }, [form.email, registeredEmailSet]);
+
+    const showPasswordField = Boolean(selectedEmployee) && !selectedHasAccount;
+
+    const handleSelectEmployee = (recordId) => {
+        const employee = employees.find(
+            (e) => String(e.recordId || e.id) === String(recordId)
+        );
+        if (!employee) {
+            setSelectedEmployee(null);
+            return;
+        }
+
+        setSelectedEmployee(employee);
 
         setForm((prev) => ({
             ...prev,
-            firstName,
-            lastName,
-            email: member.email || "",
+            firstName: employee.firstName || "",
+            lastName: employee.lastName || "",
+            email: employee.email || "",
+            phoneNumber: employee.phoneNumber || "",
+            staffId: employee.staffId || "",
+            designation: employee.designation || "",
+            password: "",
         }));
     };
 
@@ -79,6 +125,15 @@ function AddResourceModal({ projectId, projectCode, projectName, existingEmails 
             return;
         }
 
+        if (showPasswordField && !form.password) {
+            showNotification({
+                type: "error",
+                title: "Missing password",
+                message: "A default password is required to create this staff member's account"
+            });
+            return;
+        }
+
         try {
             setLoading(true);
             const response = await addProjectResource(projectId, form);
@@ -94,10 +149,14 @@ function AddResourceModal({ projectId, projectCode, projectName, existingEmails 
 
             onAdded(freshProject);
 
+            const accountCreated = Boolean(showPasswordField && form.password);
+
             showNotification({
                 type: "success",
-                title: "Resource Added!",
-                message: `${form.firstName} ${form.lastName} has been added to ${projectName ?? "the project"}`
+                title: accountCreated ? "Resource Added & Account Created!" : "Resource Added!",
+                message: accountCreated
+                    ? `${form.firstName} ${form.lastName} has been added to ${projectName ?? "the project"} and their account created. They will receive their credentials by email.`
+                    : `${form.firstName} ${form.lastName} has been added to ${projectName ?? "the project"}`
             });
 
             onClose();
@@ -141,35 +200,44 @@ function AddResourceModal({ projectId, projectCode, projectName, existingEmails 
 
                 <div className='rounded-lg border border-[#0000000D] bg-[#F3F3F3] p-4'>
                     <p className='font-normal text-[13px]/[20px] text-[#636363]'>
-                        Pick an existing staff member from the system — their details are filled in automatically. If they are not listed, capture the details below to add them to <span className='font-medium text-[#1B3C4A]'>{projectName ?? "this project"}</span>.
+                        Pick an employee from the staff directory — their details are filled in automatically. If this is their first time in the portal, a password field appears and an account is created for them. If they are not listed, capture the details below to add them to <span className='font-medium text-[#1B3C4A]'>{projectName ?? "this project"}</span>.
                     </p>
                 </div>
 
                 <form className='flex flex-col gap-4' onSubmit={handleSubmit}>
                     <div className='flex flex-col gap-1.5'>
-                        <label className={labelClass}>Select existing staff</label>
+                        <label className={labelClass}>Select employee from directory</label>
                         <select
-                            value=""
-                            onChange={(e) => handleSelectStaff(e.target.value)}
+                            value={selectedEmployee ? String(selectedEmployee.recordId || selectedEmployee.id) : ""}
+                            onChange={(e) => handleSelectEmployee(e.target.value)}
                             className={inputClass}
-                            disabled={staffLoading}
+                            disabled={employeesLoading}
                         >
                             <option value="">
-                                {staffLoading
-                                    ? "Loading staff..."
-                                    : availableStaff.length === 0
-                                        ? staff.length === 0
-                                            ? "No staff accounts found in the system"
+                                {employeesLoading
+                                    ? "Loading staff directory..."
+                                    : availableEmployees.length === 0
+                                        ? employees.length === 0
+                                            ? "Directory unavailable — enter details manually"
                                             : "All staff are already on this project"
-                                        : "Select a staff member"}
+                                        : "Select an employee"}
                             </option>
-                            {availableStaff.map((member) => (
-                                <option key={member.id} value={member.id}>
-                                    {member.fullName} — {member.email}
+                            {availableEmployees.map((employee) => (
+                                <option key={employee.recordId || employee.id} value={employee.recordId || employee.id}>
+                                    {employee.fullName} — {employee.email}{employee.designation ? ` (${employee.designation})` : ""}
                                 </option>
                             ))}
                         </select>
                     </div>
+
+                    {selectedHasAccount && (
+                        <div className='rounded-lg border border-[#D1FADF] bg-[#ECFDF3] p-3'>
+                            <p className='font-normal text-[13px]/[20px] text-[#067647]'>
+                                This employee already has a portal account — they will be added as a resource without creating a new one.
+                            </p>
+                        </div>
+                    )}
+
                     <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
                         <div className='flex flex-col gap-1.5'>
                             <label className={labelClass}>First name <span className='text-[#B42318]'>*</span></label>
@@ -232,7 +300,7 @@ function AddResourceModal({ projectId, projectCode, projectName, existingEmails 
                         </div>
 
                         <div className='flex flex-col gap-1.5'>
-                            <label className={labelClass}>Designation</label>
+                            <label className={labelClass}>Designation / title</label>
                             <input
                                 type="text"
                                 name="designation"
@@ -242,6 +310,25 @@ function AddResourceModal({ projectId, projectCode, projectName, existingEmails 
                                 className={inputClass}
                             />
                         </div>
+
+                        {showPasswordField && (
+                            <div className='flex flex-col gap-1.5 sm:col-span-2'>
+                                <label className={labelClass}>
+                                    Default password <span className='text-[#B42318]'>*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    name="password"
+                                    value={form.password}
+                                    onChange={handleChange}
+                                    placeholder='e.g. Welcome123'
+                                    className={inputClass}
+                                />
+                                <p className='font-normal text-[12px]/[18px] text-[#667085]'>
+                                    No account exists for this email yet — submitting creates a STAFF account with this password. The staff member receives it by email and must change it on first login.
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                     <button
@@ -250,7 +337,7 @@ function AddResourceModal({ projectId, projectCode, projectName, existingEmails 
                         className='w-full h-11 rounded-lg text-[#FFFFFF] font-medium bg-[#1B3C4A] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-80'
                     >
                         <i className="fa-regular fa-circle-check text-[#FFFFFF]"></i>
-                        {loading ? "Adding..." : "Add Resource"}
+                        {loading ? "Adding..." : showPasswordField ? "Add Resource & Create Account" : "Add Resource"}
                     </button>
                 </form>
             </div>

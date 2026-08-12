@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import bgSignIn from "../../assets/bgSignIn.jpg"
 import bgSignInTwo from "../../assets/bgSignInTwo.jpg"
 import { useState } from 'react'
-import { api } from '../../api'
+import { api, forgotPassword } from '../../api'
 import { useNotification } from '../NotificationContext'
 import SignUp from './SignUp'
 
@@ -11,6 +11,9 @@ function SignIn({ setUser }) {
     const [email, setEmail] = useState(null)
     const [password, setPassword] = useState(null)
     const [showSignUp, setShowSignUp] = useState(false)
+    const [showForgot, setShowForgot] = useState(false)
+    const [forgotEmail, setForgotEmail] = useState("")
+    const [forgotLoading, setForgotLoading] = useState(false)
     const { showNotification } = useNotification()
     const [loading, setLoading] = useState(false);
 
@@ -180,11 +183,55 @@ function SignIn({ setUser }) {
 
                         </div>
 
-                        <label 
-                            htmlFor="" 
-                            className='text-[14px]/[20px] tracking-[0%] text-[#1B3C4A] font-medium'>
+                        <button
+                            type="button"
+                            onClick={() => setShowForgot((prev) => !prev)}
+                            className='text-[14px]/[20px] tracking-[0%] text-[#1B3C4A] font-medium cursor-pointer hover:underline'>
                                 Forgot password?
-                        </label>
+                        </button>
+
+                        {showForgot && (
+                            <div className='mt-3 w-90 rounded-lg border border-[#D0D5DD] bg-[#FFFFFF] p-4'>
+                                <p className='mb-3 font-normal text-[13px]/[20px] text-[#475467]'>
+                                    Enter your email and we will send you a link to reset your password.
+                                </p>
+                                <input
+                                    type="email"
+                                    value={forgotEmail}
+                                    onChange={(e) => setForgotEmail(e.target.value)}
+                                    placeholder='Enter your email'
+                                    className='w-full h-10 rounded-lg bg-[#FFFFFF] border border-[#D0D5DD] py-2.5 px-3.5 outline-none text-[#090909] text-[14px]'
+                                />
+                                <button
+                                    type="button"
+                                    disabled={forgotLoading}
+                                    onClick={async () => {
+                                        if (!forgotEmail) {
+                                            showNotification({ type: "error", title: "Email required", message: "Please enter your email address." });
+                                            return;
+                                        }
+                                        try {
+                                            setForgotLoading(true);
+                                            await forgotPassword(forgotEmail);
+                                            showNotification({
+                                                type: "success",
+                                                title: "Reset link sent",
+                                                message: "If an account exists for that email, a password reset link has been sent."
+                                            });
+                                            setForgotEmail("");
+                                            setShowForgot(false);
+                                        } catch (error) {
+                                            console.error(error);
+                                            showNotification({ type: "error", title: "Request failed", message: "Something went wrong. Please try again." });
+                                        } finally {
+                                            setForgotLoading(false);
+                                        }
+                                    }}
+                                    className='mt-3 w-full h-10 rounded-lg text-[#FFFFFF] font-medium bg-[#1B3C4A] cursor-pointer disabled:opacity-80 text-[14px]'>
+                                    {forgotLoading ? "Sending..." : "Send reset link"}
+                                </button>
+                            </div>
+                        )}
 
                         <button 
                             type='submit' 

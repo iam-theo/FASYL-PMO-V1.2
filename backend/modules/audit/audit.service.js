@@ -32,6 +32,9 @@ const ROUTE_ACTIONS = [
   { method: "POST", pattern: /^\/auth\/register$/, module: "Auth", action: "Registered a new account" },
   { method: "POST", pattern: /^\/auth\/signup$/, module: "Auth", action: "Created a test account" },
   { method: "POST", pattern: /^\/auth\/login$/, module: "Auth", action: "Signed in" },
+  { method: "POST", pattern: /^\/auth\/users$/, module: "Auth", action: "Created a user account" },
+  { method: "POST", pattern: /^\/auth\/users\/[^/]+\/resend-credentials$/, module: "Auth", action: "Resent account credentials" },
+  { method: "DELETE", pattern: /^\/auth\/users\/[^/]+$/, module: "Auth", action: "Removed a user account" },
 
   // Projects
   { method: "POST", pattern: /^\/projects\/?$/, module: "Projects", action: "Created a project" },

@@ -1,5 +1,6 @@
 import { PrismaClient, WorkflowStatus } from "@prisma/client";
 import { getPolicy } from "../../modules/workflow/workflow.policy.js";
+import { createUserAccountService } from "../auth/auth.service.js";
 const prisma = new PrismaClient();
 // import axios from "axios";
 
@@ -778,6 +779,7 @@ export const addResourceToProjectService = async (projectId, data, user) => {
   const email = String(data.email || "").trim().toLowerCase();
   const staffId = String(data.staffId || "").trim();
   const recordId = String(data.recordId || `MAN-${Date.now()}`).trim();
+  const password = String(data.password || "").trim();
 
   const resource = {
     recordId,
@@ -787,7 +789,9 @@ export const addResourceToProjectService = async (projectId, data, user) => {
     phoneNumber: String(data.phoneNumber || "").trim(),
     staffId,
     designation: String(data.designation || "").trim(),
-    role: String(data.role || "").trim(),
+    // Resources added through the modal are staff by default; an explicit
+    // role (e.g. from a sales-sync payload) still wins.
+    role: String(data.role || "STAFF").trim(),
   };
 
   if (!resource.firstName || !resource.lastName) {
@@ -807,12 +811,48 @@ export const addResourceToProjectService = async (projectId, data, user) => {
     );
   }
 
+  // Dual-purpose flow: when a temporary password is supplied and the staff
+  // member has no account yet, create their STAFF account on the fly (flagged
+  // for a mandatory first-login password change) before assigning them. The
+  // password is never persisted on the project resource record.
+  let accountCreated = false;
+
+  if (password) {
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+
+    if (existingUser) {
+      throw new Error(
+        "An account already exists for this email — add the resource without a password"
+      );
+    }
+
+    const fullName = `${resource.firstName} ${resource.lastName}`.trim();
+
+    const created = await createUserAccountService({
+      fullName,
+      email,
+      password,
+      role: "STAFF",
+    });
+
+    if (!created?.id) {
+      throw new Error("Failed to create account for this staff member");
+    }
+
+    accountCreated = true;
+  }
+
   resources.push(resource);
 
-  return await prisma.project.update({
+  const updatedProject = await prisma.project.update({
     where: { id: project.id },
     data: { resources },
   });
+
+  return { project: updatedProject, resource, accountCreated };
 };
 
 /* =========================================

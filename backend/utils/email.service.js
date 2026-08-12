@@ -37,8 +37,26 @@ const getTransporter = () => {
 };
 
 /**
+ * Dumps the full message to the server console. Used while SMTP is down so
+ * the exact content that *would* be sent stays visible during development.
+ */
+const logEmailContent = (to, subject, text, html) => {
+  console.log(
+    "📧 [DEV] Email content (NOT sent — see reason above/below):",
+  );
+  console.log(`  To:      ${to}`);
+  console.log(`  Subject: ${subject}`);
+  console.log(`  --- text ---\n${text}\n  --- end text ---`);
+  if (html) {
+    console.log(`  --- html ---\n${html}\n  --- end html ---`);
+  }
+};
+
+/**
  * Sends an email over SMTP. Never throws — assignment flows must not break
  * when mail delivery fails. Logs the outcome and returns a result object.
+ * While SMTP is unavailable (not configured or provider rejects the send)
+ * the full message content is dumped to the dev console for testing.
  */
 export const sendEmail = async ({ to, subject, text, html }) => {
   if (!to) {
@@ -49,6 +67,7 @@ export const sendEmail = async ({ to, subject, text, html }) => {
     console.warn(
       `📧 Email skipped (SMTP not configured) -> ${to}: ${subject}`,
     );
+    logEmailContent(to, subject, text, html);
     return { success: false, skipped: true, error: "SMTP not configured" };
   }
 
@@ -65,6 +84,7 @@ export const sendEmail = async ({ to, subject, text, html }) => {
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error(`❌ Email failed for ${to} | ${subject}`, error.message);
+    logEmailContent(to, subject, text, html);
     return { success: false, error: error.message };
   }
 };

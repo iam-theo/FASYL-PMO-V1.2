@@ -55,6 +55,36 @@ export const refreshLimiter = rateLimit({
     legacyHeaders: false,
 });
 
+// Reset-link requests are a favourite spam/abuse vector: a strict per-IP cap
+// (3 per 15 minutes) stops email bombing, and every response counts (unlike
+// registerLimiter which skips successful ones).
+export const forgotPasswordLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 3,
+
+    message: {
+        success: false,
+        message: "Too many password reset requests. Try again in 15 minutes.",
+    },
+
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+// Attempting resets with guessed/brute-forced tokens is limited the same way.
+export const resetPasswordLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+
+    message: {
+        success: false,
+        message: "Too many reset attempts. Try again in 15 minutes.",
+    },
+
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
 export const writeLimiter = rateLimit({
     windowMs: 1 * 60 * 1000,
     max: 200,
