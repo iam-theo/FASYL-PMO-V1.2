@@ -67,7 +67,7 @@ function WorkflowBadge({ status }) {
 
 function StageStepper({ steps }) {
     return (
-        <div className="no-scrollbar -mx-1 mt-5 overflow-x-auto">
+        <div className="no-scrollbar -mx-1 py-2 mt-5 overflow-x-auto">
             <div className="flex min-w-max items-start px-1">
                 {steps.map((step, i) => (
                     <Fragment key={step.order}>
@@ -438,7 +438,7 @@ function ProjectLifeCycle({
     const nextStage = projectStage?.stageOrder !== 8 ? getStage((projectStage?.stageOrder || 0) + 1) : null;
 
     return (
-        <div className="relative flex flex-col gap-4">
+        <div className="relative flex flex-col gap-4 p-6">
             {/* Lifecycle progress + stepper */}
             <div className="rounded-2xl border border-line bg-surface p-4 shadow-card">
                 <div className="flex items-center justify-between gap-3">

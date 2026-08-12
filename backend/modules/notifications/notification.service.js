@@ -2,10 +2,7 @@ import { sendEmail, isEmailConfigured } from "../../utils/email.service.js";
 import { prisma } from "../../prisma/prisma.client.js";
 import { sendToUser } from "../realtime/realtime.service.js";
 
-const APP_BASE_URL =
-  process.env.APP_BASE_URL ||
-  process.env.PUBLIC_BASE_URL ||
-  "http://localhost:5173";
+const APP_BASE_URL = "http://localhost:5174";
 
 const SIGN_OFF_BUTTON_URL = `${APP_BASE_URL}/app`;
 
