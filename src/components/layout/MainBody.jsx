@@ -9,6 +9,7 @@ import TopBar from "./TopBar";
 import { REPORTS_BASE_PATH, resetReportsCache } from "../reports";
 import { startRealtime, stopRealtime } from "../../realtime";
 import { useRealtimeModule } from "../../realtimeData";
+import ChangePasswordForm from "./ChangePasswordForm";
 
 function MainBody({ user, setUser }) {
   const navigate = useNavigate();
@@ -127,6 +128,15 @@ function MainBody({ user, setUser }) {
     else if (isReportsRoute) navigate("/app");
   };
 
+  // Persists the fresh user returned after a forced first-login password
+  // change, lifting the gate.
+  const handleForcedPasswordChanged = (updatedUser) => {
+    const stored = JSON.parse(localStorage.getItem("user") || "null") || {};
+    const next = { ...stored, ...updatedUser };
+    localStorage.setItem("user", JSON.stringify(next));
+    setUser(next);
+  };
+
   return (
     <div className="relative mx-auto flex w-full max-w-[1440px] h-screen overflow-hidden bg-canvas">
       <SideBar
@@ -174,7 +184,18 @@ function MainBody({ user, setUser }) {
           handleLogout={handleLogout}
         />
 
-        {isReportsRoute ? (
+        {user?.mustChangePassword ? (
+          <main className="flex-1 min-h-0 overflow-y-auto no-scrollbar bg-canvas">
+            <div className="mx-auto flex w-full max-w-[1400px] items-start justify-center px-4 py-16 sm:px-6 lg:px-8">
+              <ChangePasswordForm
+                title="Change your password to continue"
+                subtitle="You are using a temporary password. Choose a new one — you will not be able to use the portal until it is changed."
+                submitLabel="Change password & continue"
+                onSuccess={handleForcedPasswordChanged}
+              />
+            </div>
+          </main>
+        ) : isReportsRoute ? (
           <main className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
             <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
               {outlet}
@@ -196,6 +217,7 @@ function MainBody({ user, setUser }) {
             selectedProject={selectedProject}
             setSelectedProject={setSelectedProject}
             user={user}
+            setUser={setUser}
             isLoading={isLoading}
           />
         )}

@@ -138,18 +138,18 @@ export const addProjectResource = async (req, res) => {
   try {
     const { projectId } = req.params;
 
-    const project = await addResourceToProjectService(
-      projectId,
-      req.body,
-      req.user,
-    );
+    const { project, resource, accountCreated } =
+      await addResourceToProjectService(projectId, req.body, req.user);
 
-    // Let the added staff member know they are now on this project.
-    if (req.body?.email) {
+    // Let the added staff member know they are now on this project. When an
+    // account was just created for them, the temporary password is included
+    // with a first-login change notice.
+    if (resource?.email) {
       notifyResourceAssigned({
         project,
-        resource: req.body,
+        resource,
         assignedBy: req.user,
+        temporaryPassword: accountCreated ? req.body.password : undefined,
       }).catch((error) => {
         console.error("Resource assignment notification failed:", error.message);
       });
@@ -157,7 +157,9 @@ export const addProjectResource = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Resource added successfully",
+      message: accountCreated
+        ? "Resource added and account created successfully"
+        : "Resource added successfully",
       data: project,
     });
   } catch (err) {

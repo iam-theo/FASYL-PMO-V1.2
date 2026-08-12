@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { FaCheckCircle, FaExclamationCircle } from "react-icons/fa";
 import SignIn from "./components/auth/SignIn";
+import ResetPassword from "./components/auth/ResetPassword";
 import MainBody from "./components/layout/MainBody";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { useNotification } from "./components/NotificationContext";
@@ -46,6 +47,9 @@ function App() {
 
       <Routes>
         <Route path="/" element={<SignIn setUser={setUser} />} />
+
+        {/* Landing page for the emailed password reset link. */}
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         <Route
           path="/app"
