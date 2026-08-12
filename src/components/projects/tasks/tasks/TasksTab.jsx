@@ -81,7 +81,16 @@ function TasksTab({
 
             if (priorityFilter !== "All Priorities" && task.priority !== priorityFilter) return false
 
-            if (assigneeFilter !== "All Team Members" && task.assignee?.id !== assigneeFilter) return false
+            if (
+                assigneeFilter !== "All Team Members" &&
+                !(
+                    task.assignee?.id === assigneeFilter ||
+                    (Array.isArray(task.assignees) &&
+                        task.assignees.some((assignee) => assignee.id === assigneeFilter))
+                )
+            ) {
+                return false;
+            }
 
             if (!matchesDueDateFilter(task.dueDate, dueDateFilter)) return false
 
@@ -130,6 +139,7 @@ function TasksTab({
             startDate: task.startDate?.split("T")[0] ?? "",
             dueDate: task.dueDate?.split("T")[0] ?? "",
             assignee: task.assignee,
+            assignees: task.assignees,
         });
 
         setIsCreateModalOpen(true);
@@ -614,8 +624,25 @@ function TasksTab({
                                                             </div>
                                                         )}
                                                     </td>
-                                                    <td className='px-6 py-4 font-normal text-[14px]/[20px] text-[#636363] whitespace-nowrap'>
-                                                        {task.assignee.fullName}
+                                                    <td className='px-6 py-4 whitespace-nowrap'>
+                                                        {(Array.isArray(task.assignees) && task.assignees.length > 0
+                                                            ? task.assignees
+                                                            : task.assignee
+                                                                ? [task.assignee]
+                                                                : []
+                                                        ).map((assignee) => (
+                                                            <span
+                                                                key={assignee.id}
+                                                                className='inline-flex items-center rounded-full border border-[#0000000D] bg-[#FFFFFF] px-2.5 py-1 mr-1.5 mb-1 font-normal text-[12px]/[18px] text-[#344054]'
+                                                            >
+                                                                {assignee.fullName}
+                                                            </span>
+                                                        ))}
+                                                        {(Array.isArray(task.assignees) && task.assignees.length === 0) && !task.assignee && (
+                                                            <span className='font-normal text-[14px]/[20px] text-[#636363]'>
+                                                                Unassigned
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     <td className='px-6 py-4'>
                                                         {effectiveReadOnly ? (

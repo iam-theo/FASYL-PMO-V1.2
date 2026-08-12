@@ -64,7 +64,11 @@ function ProjectWorkspace({
                     ? stageTasks.filter(
                         (task) =>
                             task.assignedResourceId === me.recordId ||
-                            task.assignee?.id === me.recordId
+                            task.assignee?.id === me.recordId ||
+                            (Array.isArray(task.assignees) &&
+                                task.assignees.some(
+                                    (assignee) => assignee.id === me.recordId
+                                ))
                       )
                     : [];
             }
