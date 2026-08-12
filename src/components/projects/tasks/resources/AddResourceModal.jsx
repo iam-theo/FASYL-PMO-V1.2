@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { addProjectResource, api, getEmployees, getStaff } from '../../../../api'
 import { useNotification } from '../../../NotificationContext'
+import EmployeeDirectoryPicker from '../../../layout/EmployeeDirectoryPicker'
 
 function AddResourceModal({ projectId, projectCode, projectName, existingEmails = [], onClose, onAdded }) {
 
@@ -86,10 +87,7 @@ function AddResourceModal({ projectId, projectCode, projectName, existingEmails 
 
     const showPasswordField = Boolean(selectedEmployee) && !selectedHasAccount;
 
-    const handleSelectEmployee = (recordId) => {
-        const employee = employees.find(
-            (e) => String(e.recordId || e.id) === String(recordId)
-        );
+    const handleSelectEmployee = (employee) => {
         if (!employee) {
             setSelectedEmployee(null);
             return;
@@ -207,27 +205,19 @@ function AddResourceModal({ projectId, projectCode, projectName, existingEmails 
                 <form className='flex flex-col gap-4' onSubmit={handleSubmit}>
                     <div className='flex flex-col gap-1.5'>
                         <label className={labelClass}>Select employee from directory</label>
-                        <select
-                            value={selectedEmployee ? String(selectedEmployee.recordId || selectedEmployee.id) : ""}
-                            onChange={(e) => handleSelectEmployee(e.target.value)}
-                            className={inputClass}
-                            disabled={employeesLoading}
-                        >
-                            <option value="">
-                                {employeesLoading
-                                    ? "Loading staff directory..."
-                                    : availableEmployees.length === 0
-                                        ? employees.length === 0
-                                            ? "Directory unavailable — enter details manually"
-                                            : "All staff are already on this project"
-                                        : "Select an employee"}
-                            </option>
-                            {availableEmployees.map((employee) => (
-                                <option key={employee.recordId || employee.id} value={employee.recordId || employee.id}>
-                                    {employee.fullName} — {employee.email}{employee.designation ? ` (${employee.designation})` : ""}
-                                </option>
-                            ))}
-                        </select>
+                        <EmployeeDirectoryPicker
+                            employees={availableEmployees}
+                            loading={employeesLoading}
+                            value={selectedEmployee}
+                            onSelect={handleSelectEmployee}
+                            emptyMessage={
+                                employeesLoading
+                                    ? undefined
+                                    : employees.length === 0
+                                        ? "Directory unavailable — enter details manually"
+                                        : "All staff are already on this project"
+                            }
+                        />
                     </div>
 
                     {selectedHasAccount && (
