@@ -1,7 +1,6 @@
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { jsPDF, GState } from 'jspdf';
 import * as XLSX from 'xlsx';
-import { REPORT_FORMAT, getReportFormatMeta } from '../constants/report.constants';
+import { REPORT_FORMAT, getReportFormatMeta, getReportTypeMeta } from '../constants/report.constants';
 import { formatDateRange, formatDateTime } from './date';
 import { openFile } from './download';
 
@@ -14,8 +13,8 @@ import { openFile } from './download';
  *
  * WHAT EACH FORMAT DOES NOW:
  *   - CSV, HTML and Markdown are produced exactly, from a Blob.
- *   - PDF is a real PDF generated with jsPDF + jspdf-autotable (metadata table
- *     first, then the prose content wrapped across pages).
+ *   - PDF is a real PDF generated with jsPDF — a branded gradient cover band,
+ *     a styled metadata card and wrapped content with page footers.
  *   - Excel (.xlsx) is a genuine OOXML workbook generated with SheetJS.
  *   - Word keeps the old HTML-in-a-.doc route (both Office apps open it), but it
  *     is NOT true OOXML.
@@ -69,8 +68,15 @@ const escapeHtml = (value) =>
 const metadataRows = (report, { includeDescription = false } = {}) => [
   ['Title', report.title],
   ...(includeDescription ? [['Description', report.description ?? '—']] : []),
-  ['Project', report.projectName ?? report.projectId],
-  ['Stage', report.stageName ?? (report.stageId ? `Stage ${report.stageId}` : 'Whole project')],
+  // Name first, id after — "ORACLE — PROJ-554839" / "Planning — Stage 4" — so
+  // the human-readable label always leads and the id stays for traceability.
+  ['Project', [report.projectName, report.projectId].filter(Boolean).join(' — ')],
+  [
+    'Stage',
+    [report.stageName, report.stageId ? `Stage ${report.stageId}` : null]
+      .filter(Boolean)
+      .join(' — ') || 'Whole project',
+  ],
   ['Type', report.type],
   ['Format', getReportFormatMeta(report.format).label],
   ['Reporting period', formatDateRange(report.periodStart, report.periodEnd)],
@@ -162,7 +168,78 @@ const buildXlsx = (report) => {
   return XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
 };
 
-/** Real PDF bytes (jsPDF + autotable): metadata table, then wrapped content. */
+/* ------------------------- PDF styling helpers ------------------------- */
+
+/** Palette shared by the PDF cover band, metadata card and footers. */
+const RGB = {
+  navy: [27, 60, 74],
+  teal: [46, 107, 124],
+  amber: [245, 158, 11],
+  bandMuted: [214, 227, 232],
+  text: [30, 41, 59],
+  muted: [100, 116, 139],
+  panel: [248, 250, 252],
+  border: [226, 232, 240],
+  white: [255, 255, 255],
+};
+
+/** Icon-tile colours, one per metadata item (cycled). */
+const TILE_COLORS = [
+  [27, 60, 74], // navy
+  [14, 165, 233], // sky
+  [139, 92, 246], // violet
+  [245, 158, 11], // amber
+  [16, 185, 129], // emerald
+  [244, 63, 94], // rose
+];
+
+/** jsPDF has no native gradients — fake one with thin interpolated stripes. */
+const drawGradientBand = (doc, x, y, width, height, from, to) => {
+  const stripes = 56;
+  const step = height / stripes;
+  for (let i = 0; i < stripes; i += 1) {
+    const t = i / (stripes - 1);
+    const rgb = from.map((channel, index) =>
+      Math.round(channel + (to[index] - channel) * t),
+    );
+    doc.setFillColor(...rgb);
+    doc.rect(x, y + i * step, width, step + 0.25, 'F');
+  }
+};
+
+/** Branded footer on every page: rule, mark, title, page numbers. */
+const drawPdfFooter = (doc, report, pageWidth, margin) => {
+  const total = doc.getNumberOfPages();
+  for (let page = 1; page <= total; page += 1) {
+    doc.setPage(page);
+    const y = 285;
+
+    doc.setDrawColor(...RGB.border);
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, pageWidth - margin, y);
+
+    doc.setFillColor(...RGB.navy);
+    doc.circle(margin + 1, y + 3.2, 1, 'F');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...RGB.navy);
+    doc.text('FASYL PMO', margin + 4, y + 5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...RGB.muted);
+    doc.text(String(report.title ?? '').slice(0, 60), margin + 26, y + 5);
+
+    doc.text(`Page ${page} of ${total}`, pageWidth - margin, y + 5, {
+      align: 'right',
+    });
+  }
+};
+
+/**
+ * Real PDF bytes (jsPDF): branded gradient cover band, styled metadata card
+ * and wrapped content, with footers on every page.
+ */
 const buildPdf = (report) => {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -170,51 +247,153 @@ const buildPdf = (report) => {
   const margin = 14;
   const maxWidth = pageWidth - margin * 2;
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
-  doc.setTextColor(15, 23, 42);
-  doc.text(report.title, margin, 18);
+  // --- Cover band ------------------------------------------------------
+  const titleLines = doc.splitTextToSize(report.title, maxWidth);
+  const descLines = report.description
+    ? doc.splitTextToSize(report.description, maxWidth)
+    : [];
+  const bandHeight = 27 + titleLines.length * 7.2 + descLines.length * 4.8 + 10;
 
-  let startY = 24;
-  if (report.description) {
+  drawGradientBand(doc, 0, 0, pageWidth, bandHeight, RGB.navy, RGB.teal);
+
+  // Brand mark + wordmark
+  doc.setFillColor(...RGB.white);
+  doc.roundedRect(margin, 7, 6.5, 6.5, 1.8, 1.8, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(...RGB.navy);
+  doc.text('F', margin + 3.25, 7 + 4.6, { align: 'center' });
+
+  doc.setTextColor(...RGB.white);
+  doc.text('FASYL PMO', margin + 9, 7 + 4.6);
+
+  // Report-type badge (top right, glassy)
+  const typeLabel = getReportTypeMeta(report.type).label;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  const badgeW = doc.getTextWidth(typeLabel) + 8;
+  const badgeH = 6;
+  const badgeX = pageWidth - margin - badgeW;
+  doc.saveGraphicsState();
+  doc.setGState(new GState({ opacity: 0.18 }));
+  doc.setFillColor(...RGB.white);
+  doc.roundedRect(badgeX, 7.25, badgeW, badgeH, 3, 3, 'F');
+  doc.restoreGraphicsState();
+  doc.setTextColor(...RGB.white);
+  doc.text(typeLabel, badgeX + badgeW / 2, 7.25 + 4.2, { align: 'center' });
+
+  // Eyebrow + title
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...RGB.amber);
+  doc.text('R E P O R T', margin, 19.5);
+
+  doc.setFontSize(20);
+  doc.setTextColor(...RGB.white);
+  doc.text(titleLines, margin, 27);
+
+  if (descLines.length > 0) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    doc.setTextColor(71, 85, 105);
-    doc.text(doc.splitTextToSize(report.description, maxWidth), margin, startY);
-    startY += 8;
+    doc.setTextColor(...RGB.bandMuted);
+    doc.text(descLines, margin, 27 + titleLines.length * 7.2 + 5);
   }
 
-  autoTable(doc, {
-    head: [['Field', 'Value']],
-    body: metadataRows(report).map(([label, value]) => [label, value]),
-    startY,
-    margin: { left: margin, right: margin, top: margin, bottom: margin },
-    styles: { fontSize: 9, cellPadding: 2.5 },
-    headStyles: { fillColor: [27, 60, 74], textColor: 255, fontStyle: 'bold' },
-    alternateRowStyles: { fillColor: [247, 249, 251] },
+  // Amber accent strip at the foot of the band
+  doc.setFillColor(...RGB.amber);
+  doc.rect(0, bandHeight - 1.5, pageWidth, 1.5, 'F');
+
+  // --- Metadata card -----------------------------------------------------
+  const items = metadataRows(report)
+    .filter(([label]) => label !== 'Title' && label !== 'Description')
+    .map(([label, value], index) => ({
+      label,
+      value,
+      color: TILE_COLORS[index % TILE_COLORS.length],
+    }));
+
+  const cardX = margin;
+  const cardW = pageWidth - margin * 2;
+  const padding = 10;
+  const columns = 2;
+  const colGap = 10;
+  const cellW = (cardW - padding * 2 - colGap) / columns;
+  const rows = Math.ceil(items.length / columns);
+  const rowH = 17;
+  const cardH = 16 + rows * rowH + 10;
+  const cardY = bandHeight + 10;
+
+  doc.setFillColor(...RGB.panel);
+  doc.setDrawColor(...RGB.border);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(cardX, cardY, cardW, cardH, 4, 4, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(...RGB.muted);
+  doc.text('R E P O R T   D E T A I L S', cardX + padding, cardY + 8);
+
+  items.forEach((item, index) => {
+    const col = index % columns;
+    const row = Math.floor(index / columns);
+    const x = cardX + padding + col * (cellW + colGap);
+    const y = cardY + 16 + row * rowH;
+
+    // Colour tile with the value's initial
+    doc.setFillColor(...item.color);
+    doc.roundedRect(x, y, 6.5, 6.5, 1.8, 1.8, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...RGB.white);
+    doc.text(
+      String(item.value).trim().charAt(0).toUpperCase() || '•',
+      x + 3.25,
+      y + 4.6,
+      { align: 'center' },
+    );
+
+    // Label + value
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(...RGB.muted);
+    doc.text(item.label.toUpperCase(), x + 10, y + 3);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9.5);
+    doc.setTextColor(...RGB.text);
+    const valueLines = doc.splitTextToSize(String(item.value), cellW - 10);
+    doc.text(valueLines.slice(0, 2), x + 10, y + 8);
   });
 
-  let y = doc.lastAutoTable.finalY + 12;
+  // --- Report content -----------------------------------------------------
+  let y = cardY + cardH + 16;
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
-  doc.setTextColor(15, 23, 42);
+  doc.setTextColor(...RGB.navy);
   doc.text('Report content', margin, y);
-  y += 6;
+  doc.setDrawColor(...RGB.amber);
+  doc.setLineWidth(0.8);
+  doc.line(margin, y + 2.2, margin + 30, y + 2.2);
+  y += 9;
 
   const content = report.content ?? 'This report has no inline content.';
   const lines = doc.splitTextToSize(content, maxWidth);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
+  doc.setTextColor(...RGB.text);
 
   for (const line of lines) {
-    if (y > pageHeight - margin) {
+    if (y > pageHeight - margin - 8) {
       doc.addPage();
-      y = margin;
+      y = margin + 4;
     }
     doc.text(line, margin, y);
-    y += 5;
+    y += 5.2;
   }
+
+  // Footer on every page
+  drawPdfFooter(doc, report, pageWidth, margin);
 
   return doc.output('blob');
 };

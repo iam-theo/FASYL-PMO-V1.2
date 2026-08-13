@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { reportService } from '../services/reportService';
+import { projectService } from '../services/projectService';
 import { downloadReport } from '../utils/reportFile';
 import { useToast } from '../components/ui/Toast';
 
@@ -19,6 +20,13 @@ import { useToast } from '../components/ui/Toast';
  * The fetched record is spread OVER the row, not under it: the row carries
  * `projectName` and `stageName` resolved from the projects list, which the
  * single-report endpoint does not return.
+ *
+ * WHY THE NAME LOOKUP: the single-report endpoint and freshly created reports
+ * carry only `projectId`/`stageId`, so a PDF downloaded from the details page
+ * (or right after creation) would otherwise print bare ids. When the report
+ * does not already carry the display names, resolve them from the cached
+ * projects list. Names are decoration — if the lookup fails, the export still
+ * works with the ids.
  */
 export const useReportDownload = () => {
   const toast = useToast();
@@ -38,6 +46,30 @@ export const useReportDownload = () => {
           full = { ...report, ...fetched };
         } catch {
           // Export what we have rather than failing outright.
+        }
+      }
+
+      const needsNames =
+        full.projectId &&
+        [full.projectName, full.stageName].some(
+          (name) => name === undefined || name === null,
+        );
+
+      if (needsNames) {
+        try {
+          const projects = await projectService.getProjects();
+          const project = projects.find((entry) => entry.id === full.projectId) ?? null;
+          if (project) {
+            const stage =
+              project.stages?.find((entry) => entry.id === full.stageId) ?? null;
+            full = {
+              ...full,
+              projectName: project.name,
+              stageName: stage?.name ?? null,
+            };
+          }
+        } catch {
+          // Names are decoration — the export still works with the ids.
         }
       }
 
