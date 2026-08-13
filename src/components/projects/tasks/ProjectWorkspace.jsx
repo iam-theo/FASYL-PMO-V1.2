@@ -40,6 +40,12 @@ function ProjectWorkspace({
 
     const isHeadOfOps = user?.role === "HEADOFOPS";
 
+    // Resource management is exclusive to the assigned project manager — the
+    // Head of Operations and staff can view resources but not modify them.
+    const isAssignedProjectManager =
+        user?.role === "PROJECTMANAGER" &&
+        project?.projectManager?.id === user?.id;
+
     const loadTasks = useCallback(async () => {
         try {
             const response  = await getTasks(projectId, currentStageOrder);
@@ -58,7 +64,11 @@ function ProjectWorkspace({
                     ? stageTasks.filter(
                         (task) =>
                             task.assignedResourceId === me.recordId ||
-                            task.assignee?.id === me.recordId
+                            task.assignee?.id === me.recordId ||
+                            (Array.isArray(task.assignees) &&
+                                task.assignees.some(
+                                    (assignee) => assignee.id === me.recordId
+                                ))
                       )
                     : [];
             }
@@ -174,7 +184,7 @@ function ProjectWorkspace({
                                     : prev,
                             );
                         }}
-                        canManageResources={!isStaff}
+                        canManageResources={isAssignedProjectManager}
                     />
                 )}
 

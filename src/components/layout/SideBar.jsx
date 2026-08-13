@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { Users, Settings } from "lucide-react";
 import FasylLogo from "../../assets/FasylLogo.svg";
 
 function DashboardIcon({ active }) {
@@ -224,6 +225,12 @@ function SideBar({
     ...(user?.role === "HEADOFOPS"
       ? [{ name: "audit", label: "Audit Logs", path: "/app" }]
       : []),
+    // User Management creates PM accounts — a Head of Operations function.
+    ...(user?.role === "HEADOFOPS"
+      ? [{ name: "users", label: "User Management", path: "/app" }]
+      : []),
+    // Every signed-in user can manage their own password.
+    { name: "settings", label: "Settings", path: "/app" },
   ];
 
   const renderIcon = (name, isActive) => {
@@ -231,6 +238,22 @@ function SideBar({
     if (name === "projects") return <ProjectsIcon active={isActive} />;
     if (name === "reports") return <ReportsIcon active={isActive} />;
     if (name === "audit") return <AuditIcon active={isActive} />;
+    if (name === "users")
+      return (
+        <Users
+          size={22}
+          strokeWidth={1.8}
+          color={isActive ? "#1B3C4A" : "#5B6470"}
+        />
+      );
+    if (name === "settings")
+      return (
+        <Settings
+          size={22}
+          strokeWidth={1.8}
+          color={isActive ? "#1B3C4A" : "#5B6470"}
+        />
+      );
     return null;
   };
 

@@ -34,6 +34,7 @@ export const storeUploadedFile = async (file) => {
   const filename = `${randomSuffix()}${ext}`;
   fs.writeFileSync(path.join(UPLOAD_DIR, filename), file.buffer);
 
-  const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "http://localhost:5000";
+  // const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "http://localhost:5000";
+  const PUBLIC_BASE_URL = "http://localhost:5000";
   return `${PUBLIC_BASE_URL.replace(/\/+$/, "")}/uploads/${filename}`;
 };

@@ -26,6 +26,7 @@ export const createTaskService = async (body, user, document = null) => {
     const {
         projectId,
         stageOrder,
+        assignedResourceIds,
         assignedResourceId,
         assignedToUserId,
         title,
@@ -38,10 +39,35 @@ export const createTaskService = async (body, user, document = null) => {
 
     const { id: loggedInUserId, role } = user;
 
-    let taskAssignedResourceId;
+    // recordIds of the project resources the task is assigned to. Multiple
+    // resources are supported; the first one is mirrored into the legacy
+    // assignedResourceId column for backward compatibility.
+    let taskAssignedResourceIds = [];
     let taskAssignedToUserId;
 
     if (!projectId || !title) throw new Error("Project ID and title are required");
+
+    // A task must always carry a priority and a start/end date — a task without
+    // a schedule or urgency is not actionable.
+    const ALLOWED_PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"];
+    const normalizedPriority = String(priority || "").toUpperCase();
+
+    if (!normalizedPriority) {
+        throw new Error("Priority is required");
+    }
+
+    if (!ALLOWED_PRIORITIES.includes(normalizedPriority)) {
+        throw new Error(
+            `Priority must be one of: ${ALLOWED_PRIORITIES.join(", ")}`
+        );
+    }
+
+    if (!startDate) throw new Error("Start date is required");
+    if (!dueDate) throw new Error("Due date is required");
+
+    if (new Date(dueDate) < new Date(startDate)) {
+        throw new Error("Due date cannot be before the start date");
+    }
 
     const project = await prisma.project.findUnique({
         where: {
@@ -80,15 +106,29 @@ export const createTaskService = async (body, user, document = null) => {
 
     if(role === ROLES.PROJECTMANAGER) {
 
-        if(!assignedResourceId) throw new Error("A Project Resource must be selected");
+        const rawResourceIds = Array.isArray(assignedResourceIds)
+            ? assignedResourceIds
+            : assignedResourceId
+                ? [assignedResourceId]
+                : [];
 
-        const resource = projectResources.find(
-            (resource) => resource.recordId === assignedResourceId
+        const requestedIds = rawResourceIds
+            .filter((id) => id !== undefined && id !== null && String(id).trim() !== "")
+            .map((id) => String(id).trim());
+
+        if (requestedIds.length === 0) {
+            throw new Error("At least one Project Resource must be selected");
+        }
+
+        const invalidIds = requestedIds.filter(
+            (id) => !projectResources.some((resource) => resource.recordId === id)
         );
 
-        if(!resource) throw new Error("The selected resource is not assigned to this project.");
+        if (invalidIds.length > 0) {
+            throw new Error("One or more selected resources are not assigned to this project.");
+        }
 
-        taskAssignedResourceId = resource.recordId;
+        taskAssignedResourceIds = [...new Set(requestedIds)];
 
     } else if (role === ROLES.HEADOFOPS) {
 
@@ -119,20 +159,21 @@ export const createTaskService = async (body, user, document = null) => {
 
             title,
             description,
-            priority: priority || "MEDIUM",
+            priority: normalizedPriority,
 
-            startDate: startDate ? new Date(startDate) : null,
+            startDate: new Date(startDate),
 
-            dueDate: dueDate ? new Date(dueDate) : null,
+            dueDate: new Date(dueDate),
 
             assignedById: loggedInUserId,
             createdById: loggedInUserId,
             assignedToUserId: taskAssignedToUserId ?? null,
-            assignedResourceId: taskAssignedResourceId,
+            assignedResourceId: taskAssignedResourceIds[0] ?? null,
             documents: document ? [document] : undefined
         },
 
         include: {
+            assignedResources: true,
             assignedToUser: {
                 select: {
                     id: true,
@@ -177,15 +218,32 @@ export const createTaskService = async (body, user, document = null) => {
 
     });
 
-    // Resolve who the reminder targets: the assigned user when there is one,
-    // else a User account matching the assigned resource's email (project
-    // resources only carry an email), else the task creator as a fallback.
-    let reminderUserId = task.assignedToUserId;
+    // Persist every resource assignment in the join table so a task can carry
+    // more than one resource.
+    if (taskAssignedResourceIds.length > 0) {
+        await prisma.taskResource.createMany({
+            data: taskAssignedResourceIds.map((resourceId) => ({
+                taskId: task.id,
+                resourceId
+            })),
+            skipDuplicates: true
+        });
 
-    if (!reminderUserId && task.assignedResourceId) {
-        const resource = projectResources.find(
-            (resource) => resource.recordId === task.assignedResourceId
-        );
+        // The create snapshot above predates the join rows — mirror them so
+        // the response reflects every assigned resource.
+        task.assignedResources = taskAssignedResourceIds.map((resourceId) => ({
+            resourceId
+        }));
+    }
+
+    // Resolve who the reminders target: each assigned user account (matched
+    // via the resource's email), falling back to the task creator.
+    const reminderUserIds = new Set();
+
+    if (task.assignedToUserId) reminderUserIds.add(task.assignedToUserId);
+
+    for (const recordId of taskAssignedResourceIds) {
+        const resource = findResourceAssignee(projectResources, recordId);
 
         if (resource?.email) {
             const account = await prisma.user.findUnique({
@@ -193,36 +251,42 @@ export const createTaskService = async (body, user, document = null) => {
                 select: { id: true }
             });
 
-            if (account) reminderUserId = account.id;
+            if (account) reminderUserIds.add(account.id);
         }
     }
 
-    if (!reminderUserId) reminderUserId = loggedInUserId;
+    if (reminderUserIds.size === 0) reminderUserIds.add(loggedInUserId);
 
     // The assigner chooses how many days before the due date the reminder
     // fires; defaults to 3 when not provided.
     const daysBefore = Math.max(0, Number(reminderDays ?? 3) || 0);
 
-    await createReminder(
-        task,
-        project,
-        stage,
-        reminderUserId,
-        daysBefore
-    );
-
-    const assignee = task.assignedToUser
-        ? task.assignedToUser
-        : findResourceAssignee(projectResources, task.assignedResourceId);
-
-    if (assignee?.email) {
-        notifyTaskAssignment({
+    for (const reminderUserId of reminderUserIds) {
+        await createReminder(
             task,
-            assignee,
-            assignedBy: task.assignedBy
-        }).catch((error) => {
-            console.error("Task assignment notification failed:", error.message);
-        });
+            project,
+            stage,
+            reminderUserId,
+            daysBefore
+        );
+    }
+
+    const assignees = task.assignedToUser
+        ? [task.assignedToUser]
+        : taskAssignedResourceIds
+            .map((recordId) => findResourceAssignee(projectResources, recordId))
+            .filter(Boolean);
+
+    for (const assignee of assignees) {
+        if (assignee?.email) {
+            notifyTaskAssignment({
+                task,
+                assignee,
+                assignedBy: task.assignedBy
+            }).catch((error) => {
+                console.error("Task assignment notification failed:", error.message);
+            });
+        }
     }
 
     return formatTask(task);
@@ -233,6 +297,7 @@ export const getTaskServiceAll = async () => {
     const tasks = await prisma.task.findMany({
 
         include: {
+            assignedResources: true,
             project: {
                 select: {
                     id: true,
@@ -282,68 +347,7 @@ export const getTaskServiceAll = async () => {
         }
     });
 
-    const formattedTasks = tasks.map((task) => {
-
-        let assignee = null;
-
-        if(task.assignedToUser) {
-            assignee = {
-
-                type: ROLES.PROJECTMANAGER,
-                id: task.assignedToUser.id,
-                fullName: task.assignedToUser.fullName,
-                email: task.assignedToUser.email,
-                role: task.assignedToUser.role
-            };
-        } else if(task.assignedResourceId) {
-
-            const resources = Array.isArray(task.project.resources)
-                ? task.project.resources
-                : [];
-
-            const resource = resources.find(
-                (resource) => resource.recordId === task.assignedResourceId
-            );
-
-            if(resource) {
-                assignee = {
-                    type: ROLES.RESOURCE,
-                    id: resource.recordId,
-                    fullName: `${resource.firstName} ${resource.lastName}`,
-                    email: resource.email,
-                    staffId: resource.staffId,
-                    phoneNumber: resource.phoneNumber
-                };
-            }
-        }
-
-        return {
-            id: task.id,
-            title: task.title,
-            description: task.description,
-            status: task.status,
-            priority: task.priority,
-            startDate: task.startDate,
-            dueDate: task.dueDate,
-            completedAt: task.completedAt,
-            createdAt: task.createdAt,
-            updatedAt: task.updatedAt,
-            documents: Array.isArray(task.documents) ? task.documents : [],
-
-            project: {
-                id: task.project.id,
-                projectId: task.project.projectId,
-                projectName: task.project.projectName
-            },
-
-            stage: task.stage,
-            assignee,
-            assignedBy: task.assignedBy,
-            createdBy: task.createdBy
-        };
-    });
-
-    return formattedTasks
+    return tasks.map(formatTask);
 }
 
 export const getAssignedTaskCountService = async (user) => {
@@ -380,12 +384,26 @@ export const getAssignedTaskCountService = async (user) => {
 
         if (projectIds.length === 0) return 0;
 
-        return prisma.task.count({
+        const tasks = await prisma.task.findMany({
             where: {
-                projectId: { in: projectIds },
-                assignedResourceId: { in: recordIds }
+                projectId: { in: projectIds }
+            },
+            select: {
+                id: true,
+                assignedResourceId: true,
+                assignedResources: {
+                    select: { resourceId: true }
+                }
             }
         });
+
+        return tasks.filter(
+            (task) =>
+                recordIds.includes(task.assignedResourceId) ||
+                task.assignedResources.some((assignment) =>
+                    recordIds.includes(assignment.resourceId)
+                )
+        ).length;
     }
 
     const count = await prisma.task.count({
@@ -452,6 +470,7 @@ export const getTaskService = async (
         },
 
         include: {
+            assignedResources: true,
             project: {
                 select: {
                     id: true,
@@ -513,6 +532,9 @@ export const updateTaskService = async (
     const task = await prisma.task.findUnique({
         where: {
             id: taskId
+        },
+        include: {
+            assignedResources: true
         }
     });
 
@@ -537,7 +559,71 @@ export const updateTaskService = async (
     const previousAssignedToUserId = task.assignedToUserId;
     const previousAssignedResourceId = task.assignedResourceId;
 
+    // New resource assignment set (recordIds) when a Project Manager updates
+    // the assignees — mirrors the create flow. null means "not being changed".
+    let newAssignedResourceIds = null;
+
+    // The required task fields may be updated but never cleared.
+    if (body.priority !== undefined && !String(body.priority).trim()) {
+        throw new Error("Priority is required");
+    }
+
+    if (body.startDate !== undefined && !body.startDate) {
+        throw new Error("Start date is required");
+    }
+
+    if (body.dueDate !== undefined && !body.dueDate) {
+        throw new Error("Due date is required");
+    }
+
+    if (body.startDate && body.dueDate && new Date(body.dueDate) < new Date(body.startDate)) {
+        throw new Error("Due date cannot be before the start date");
+    }
+
     let allowedBody = body;
+
+    if (
+        user &&
+        user.role === ROLES.PROJECTMANAGER &&
+        (body.assignedResourceIds !== undefined || body.assignedResourceId !== undefined)
+    ) {
+        const rawResourceIds = Array.isArray(body.assignedResourceIds)
+            ? body.assignedResourceIds
+            : body.assignedResourceId
+                ? [body.assignedResourceId]
+                : [];
+
+        const requestedIds = rawResourceIds
+            .filter((id) => id !== undefined && id !== null && String(id).trim() !== "")
+            .map((id) => String(id).trim());
+
+        if (requestedIds.length === 0) {
+            throw new Error("At least one Project Resource must be selected");
+        }
+
+        const project = await prisma.project.findUnique({
+            where: { id: task.projectId },
+            select: { resources: true }
+        });
+
+        const projectResources = Array.isArray(project?.resources)
+            ? project.resources
+            : [];
+
+        const invalidIds = requestedIds.filter(
+            (id) => !projectResources.some((resource) => resource.recordId === id)
+        );
+
+        if (invalidIds.length > 0) {
+            throw new Error("One or more selected resources are not assigned to this project.");
+        }
+
+        newAssignedResourceIds = [...new Set(requestedIds)];
+
+        // The assignment is handled above; drop the legacy key so the generic
+        // mapping below does not override the primary resource.
+        delete allowedBody.assignedResourceId;
+    }
 
     if (user && user.role === ROLES.STAFF) {
         const project = await prisma.project.findUnique({
@@ -639,6 +725,11 @@ export const updateTaskService = async (
         })
     };
 
+    // Keep the join table and the legacy primary column in sync.
+    if (newAssignedResourceIds) {
+        data.assignedResourceId = newAssignedResourceIds[0];
+    }
+
     const updatedTask = await prisma.task.update({
 
         where: {
@@ -647,6 +738,7 @@ export const updateTaskService = async (
         data,
 
         include: {
+            assignedResources: true,
             project: {
                 select: {
                     id: true,
@@ -692,32 +784,77 @@ export const updateTaskService = async (
         }
     });
 
+    // Replace the join rows when the resource set changed.
+    const previousResourceIds = Array.isArray(task.assignedResources)
+        ? task.assignedResources.map((assignment) => assignment.resourceId)
+        : previousAssignedResourceId
+            ? [previousAssignedResourceId]
+            : [];
+
+    const currentResourceIds =
+        newAssignedResourceIds ||
+        (updatedTask.assignedResourceId ? [updatedTask.assignedResourceId] : []);
+
+    const resourceSetChanged =
+        previousResourceIds.length !== currentResourceIds.length ||
+        previousResourceIds.some((id) => !currentResourceIds.includes(id)) ||
+        currentResourceIds.some((id) => !previousResourceIds.includes(id));
+
+    if (newAssignedResourceIds && resourceSetChanged) {
+        await prisma.taskResource.deleteMany({ where: { taskId } });
+        await prisma.taskResource.createMany({
+            data: newAssignedResourceIds.map((resourceId) => ({
+                taskId,
+                resourceId
+            })),
+            skipDuplicates: true
+        });
+
+        // The update snapshot predates the join replacement — mirror the new
+        // set so the response reflects every assigned resource.
+        updatedTask.assignedResources = newAssignedResourceIds.map(
+            (resourceId) => ({ resourceId })
+        );
+    }
+
     const assigneeChanged =
+        resourceSetChanged ||
         (updatedTask.assignedToUserId !== null &&
-            updatedTask.assignedToUserId !== previousAssignedToUserId) ||
-        (updatedTask.assignedResourceId !== null &&
-            updatedTask.assignedResourceId !== previousAssignedResourceId);
+            updatedTask.assignedToUserId !== previousAssignedToUserId);
 
     if (assigneeChanged) {
         const projectResources = Array.isArray(updatedTask.project?.resources)
             ? updatedTask.project.resources
             : [];
 
-        const assignee = updatedTask.assignedToUser
-            ? updatedTask.assignedToUser
-            : findResourceAssignee(
-                projectResources,
-                updatedTask.assignedResourceId
-              );
+        // Only notify the assignees that were just added, so existing assignees
+        // are not re-annoyed when the task is edited.
+        const addedAssignees = [];
 
-        if (assignee?.email) {
-            notifyTaskAssignment({
-                task: updatedTask,
-                assignee,
-                assignedBy: updatedTask.assignedBy
-            }).catch((error) => {
-                console.error("Task assignment notification failed:", error.message);
-            });
+        if (
+            updatedTask.assignedToUser &&
+            updatedTask.assignedToUserId !== previousAssignedToUserId
+        ) {
+            addedAssignees.push(updatedTask.assignedToUser);
+        }
+
+        for (const recordId of currentResourceIds) {
+            if (previousResourceIds.includes(recordId)) continue;
+
+            const resource = findResourceAssignee(projectResources, recordId);
+            if (resource) addedAssignees.push(resource);
+        }
+
+        for (const assignee of addedAssignees) {
+            if (assignee?.email) {
+                notifyTaskAssignment({
+                    task: updatedTask,
+                    assignee,
+                    assignedBy: updatedTask.assignedBy
+                }).catch((error) => {
+                    console.error("Task assignment notification failed:", error.message);
+                });
+            }
         }
     }
 

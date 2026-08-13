@@ -36,10 +36,23 @@ const CORS_ORIGINS = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(",").map((origin) => origin.trim())
   : ["http://localhost:5173", "http://localhost:5174"];
 
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+
+  return CORS_ORIGINS.includes(origin) || CORS_ORIGINS.some((allowedOrigin) => {
+    if (allowedOrigin === "*") return true;
+    if (allowedOrigin.startsWith("http://localhost:") && origin.startsWith("http://localhost:")) {
+      return true;
+    }
+    return false;
+  });
+};
+
 const API_V1 = "/api/v1";
 const API_LEGACY = "/api";
 
-app.use(apiLimiter);
+console.log("CORS_ORIGINS:", CORS_ORIGINS);
+
 
 /* =========================
    TRUST PROXY
@@ -49,14 +62,52 @@ app.set("trust proxy", 1);
 /* =========================
    CORE MIDDLEWARE
 ========================= */
+
+app.use((req, res, next) => {
+  console.log("METHOD:", req.method);
+  console.log("ORIGIN:", req.headers.origin);
+  console.log("URL:", req.originalUrl);
+
+  next();
+});
+
+app.use((req, res, next) => {
+  console.log("========== REQUEST ==========");
+  console.log("Method:", req.method);
+  console.log("URL:", req.originalUrl);
+  console.log("Origin:", req.headers.origin);
+  console.log("Access-Control-Request-Method:",
+      req.headers["access-control-request-method"]
+  );
+  console.log("Access-Control-Request-Headers:",
+      req.headers["access-control-request-headers"]
+  );
+  console.log("=============================");
+
+  next();
+});
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || isAllowedOrigin(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(null, false);
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  optionsSuccessStatus: 204,
+};
+
+app.use(cors(corsOptions));
+// app.options("*", cors(corsOptions));
+
 app.use(helmet());
 
-app.use(
-  cors({
-    origin: CORS_ORIGINS,
-    credentials: true,
-  })
-);
+app.use(apiLimiter);
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));

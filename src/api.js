@@ -123,6 +123,101 @@ export const addProjectResource = async (projectId, resource) => {
   }
 };
 
+export const removeProjectResource = async (projectId, recordId) => {
+  try {
+    const { data } = await api.delete(`/projects/${projectId}/resources/${recordId}`);
+
+    return data;
+  } catch (error) {
+    return normalizeError(error, "Remove Resource Error");
+  }
+};
+
+export const getStaff = async () => {
+  try {
+    const { data } = await api.get("/auth/staff");
+
+    return data;
+  } catch (error) {
+    return normalizeError(error, "Staff Retrieval Error");
+  }
+};
+
+export const getEmployees = async () => {
+  try {
+    const { data } = await api.get("/auth/employees");
+
+    return data;
+  } catch (error) {
+    return normalizeError(error, "Employee Directory Error");
+  }
+};
+
+export const createUserAccount = async (payload) => {
+  try {
+    const { data } = await api.post("/auth/users", payload);
+
+    return data;
+  } catch (error) {
+    return normalizeError(error, "Create User Account Error");
+  }
+};
+
+export const changePassword = async (payload) => {
+  try {
+    const { data } = await api.post("/auth/change-password", payload);
+
+    return data;
+  } catch (error) {
+    return normalizeError(error, "Change Password Error");
+  }
+};
+
+export const forgotPassword = async (email) => {
+  try {
+    const { data } = await api.post("/auth/forgot-password", { email });
+
+    return data;
+  } catch (error) {
+    return normalizeError(error, "Forgot Password Error");
+  }
+};
+
+export const resetPassword = async (token, newPassword) => {
+  try {
+    const { data } = await api.post("/auth/reset-password", {
+      token,
+      newPassword,
+    });
+
+    return data;
+  } catch (error) {
+    return normalizeError(error, "Reset Password Error");
+  }
+};
+
+export const resendCredentials = async (userId) => {
+  try {
+    const { data } = await api.post(
+      `/auth/users/${userId}/resend-credentials`,
+    );
+
+    return data;
+  } catch (error) {
+    return normalizeError(error, "Resend Credentials Error");
+  }
+};
+
+export const removeUser = async (userId) => {
+  try {
+    const { data } = await api.delete(`/auth/users/${userId}`);
+
+    return data;
+  } catch (error) {
+    return normalizeError(error, "Remove User Error");
+  }
+};
+
 export const handleChecklist = async (projectId, stageId, updatedChecklist) => {
   try {
     const { data } = await api.patch(

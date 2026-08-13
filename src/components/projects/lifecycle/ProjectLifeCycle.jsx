@@ -67,7 +67,7 @@ function WorkflowBadge({ status }) {
 
 function StageStepper({ steps }) {
     return (
-        <div className="no-scrollbar -mx-1 mt-5 overflow-x-auto">
+        <div className="no-scrollbar -mx-1 py-2 mt-5 overflow-x-auto">
             <div className="flex min-w-max items-start px-1">
                 {steps.map((step, i) => (
                     <Fragment key={step.order}>
@@ -281,6 +281,12 @@ function ProjectLifeCycle({
     const isManager = user?.role === "PROJECTMANAGER";
     const isHeadOfOps = user?.role === "HEADOFOPS";
 
+    const isRejected = projectStage?.workflowStatus === "REJECTED";
+    const rejectionReason =
+        selectedProject?.approvals?.find(
+            (approval) => approval.stage === projectStage?.stageOrder
+        )?.comment || "";
+
     const actionMap = {
         PROJECTMANAGER: submitStage,
         HEADOFOPS: approveStage,
@@ -432,7 +438,7 @@ function ProjectLifeCycle({
     const nextStage = projectStage?.stageOrder !== 8 ? getStage((projectStage?.stageOrder || 0) + 1) : null;
 
     return (
-        <div className="relative flex flex-col gap-4">
+        <div className="relative flex flex-col gap-4 p-6">
             {/* Lifecycle progress + stepper */}
             <div className="rounded-2xl border border-line bg-surface p-4 shadow-card">
                 <div className="flex items-center justify-between gap-3">
@@ -527,6 +533,34 @@ function ProjectLifeCycle({
                     )}
                 </div>
             </div>
+
+            {/* Rejection feedback */}
+            {isRejected && (
+                <div className="rounded-2xl border border-[#FDA29B] bg-[#FEF3F2] p-4 shadow-card">
+                    <div className="flex items-start gap-3">
+                        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FEE4E2] text-[#D20019]">
+                            <FaRegCircleXmark className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                            <h4 className="text-[14px]/[20px] font-semibold text-[#B42318]">
+                                Stage rejected — action required
+                            </h4>
+                            <p className="mt-1 text-[13px]/[18px] text-[#912018]">
+                                {rejectionReason || "The Head of Operations rejected this stage signoff. Address the feedback and resubmit."}
+                            </p>
+                            {projectStage?.rejectedAt && (
+                                <p className="mt-1.5 text-[12px]/[16px] text-[#B42318]/70">
+                                    Rejected on {new Date(projectStage.rejectedAt).toLocaleDateString("en-GB", {
+                                        day: "numeric",
+                                        month: "short",
+                                        year: "numeric",
+                                    })}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Supporting documents */}
             <div>
