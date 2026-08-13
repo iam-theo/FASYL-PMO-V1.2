@@ -21,7 +21,7 @@ function SignIn({ setUser }) {
 
     const fillTestCredentials = () => {
         setEmail("coo@fasylng.com");
-        setPassword("123456");
+        setPassword("password123");
         showNotification({
             type: "success",
             title: "Head of Operations",

@@ -23,6 +23,7 @@ import {
   useReportDownload,
   useReportMutations,
 } from '../hooks';
+import { getCurrentUserId } from '../services/reportService';
 import { formatDateRange, formatDateTime, formatRelativeTime } from '../utils/date';
 import { buildShareUrl, copyToClipboard } from '../utils/download';
 import { getDownloadLabel } from '../utils/reportFile';
@@ -98,6 +99,10 @@ export const ReportDetailsPage = () => {
   if (error) return <ErrorState error={error} onRetry={refetch} action={backToList} />;
   if (isLoading || !report) return <DetailSkeleton />;
 
+  // Only the author may edit or delete — mirror of the server-side rule.
+  const isOwner =
+    report?.createdById != null && report.createdById === getCurrentUserId();
+
   return (
     <div ref={headingRef} tabIndex={-1} className="flex flex-col gap-6 outline-none">
       <PageHeader
@@ -112,16 +117,20 @@ export const ReportDetailsPage = () => {
             <Button variant="ghost" leadingIcon={Link} onClick={handleCopyLink}>
               Copy link
             </Button>
-            <Button
-              variant="secondary"
-              leadingIcon={Pencil}
-              onClick={() => navigate(REPORTS_ROUTES.edit(report.id))}
-            >
-              Edit
-            </Button>
-            <Button variant="danger" leadingIcon={Trash2} onClick={() => setIsDialogOpen(true)}>
-              Delete
-            </Button>
+            {isOwner && (
+              <>
+                <Button
+                  variant="secondary"
+                  leadingIcon={Pencil}
+                  onClick={() => navigate(REPORTS_ROUTES.edit(report.id))}
+                >
+                  Edit
+                </Button>
+                <Button variant="danger" leadingIcon={Trash2} onClick={() => setIsDialogOpen(true)}>
+                  Delete
+                </Button>
+              </>
+            )}
           </>
         }
       />
@@ -132,6 +141,14 @@ export const ReportDetailsPage = () => {
         <span className="text-xs text-slate-500">
           Generated <time dateTime={report.generatedAt}>{formatRelativeTime(report.generatedAt)}</time>
         </span>
+        {report.updatedAt && report.updatedAt !== report.createdAt && (
+          <span className="text-xs text-slate-500">
+            · Modified{' '}
+            <time dateTime={report.updatedAt}>
+              {formatDateTime(report.updatedAt)}
+            </time>
+          </span>
+        )}
       </div>
 
       <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -175,7 +192,7 @@ export const ReportDetailsPage = () => {
                   ? 'This report has no inline content — everything is in the attached file.'
                   : 'This report has no content yet. Add some, or download the metadata sheet.'}
               </p>
-              {!report.fileUrl && (
+              {!report.fileUrl && isOwner && (
                 <Button
                   variant="secondary"
                   leadingIcon={Pencil}

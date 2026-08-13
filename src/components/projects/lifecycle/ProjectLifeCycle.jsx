@@ -1,5 +1,5 @@
 import UploadBox from './UploadBox';
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { toggleChecklist } from './utils/ToggleChecklist';
 import { submitStage, approveStage, rejectStage } from '../../../api';
 import { useNotification } from '../../NotificationContext';
@@ -13,6 +13,7 @@ import {
     FaListCheck,
     FaRegSquareCheck,
     FaRegClock,
+    FaRegEye,
 } from 'react-icons/fa6';
 
 const STAGES = {
@@ -65,31 +66,54 @@ function WorkflowBadge({ status }) {
     );
 }
 
+function StepContent({ step }) {
+    return (
+        <>
+            <div className={`flex h-7 w-7 items-center justify-center rounded-full transition-colors ${step.dotClass}`}>
+                {step.done && <FaCheck className="h-3 w-3 text-white" />}
+                {step.rejected && <FaRegCircleXmark className="h-3.5 w-3.5 text-white" />}
+                {step.current && <span className="h-2 w-2 rounded-full bg-accent" />}
+                {step.pending && <span className="h-1.5 w-1.5 rounded-full bg-[#98A2B3]" />}
+            </div>
+            <span className={`w-full truncate text-center text-[10px]/[12px] font-medium ${
+                step.done && !step.viewed
+                    ? "text-ink"
+                    : step.current || step.viewed
+                        ? "text-accent"
+                        : step.rejected
+                            ? "text-[#D20019]"
+                            : "text-ink-muted"
+            }`}>
+                {step.label}
+            </span>
+        </>
+    );
+}
+
 function StageStepper({ steps }) {
     return (
         <div className="no-scrollbar -mx-1 py-2 mt-5 overflow-x-auto">
             <div className="flex min-w-max items-start px-1">
                 {steps.map((step, i) => (
                     <Fragment key={step.order}>
-                        <div className="flex w-14 shrink-0 flex-col items-center gap-1.5">
-                            <div className={`flex h-7 w-7 items-center justify-center rounded-full transition-colors ${step.dotClass}`}>
-                                {step.done && <FaCheck className="h-3 w-3 text-white" />}
-                                {step.rejected && <FaRegCircleXmark className="h-3.5 w-3.5 text-white" />}
-                                {step.current && <span className="h-2 w-2 rounded-full bg-accent" />}
-                                {step.pending && <span className="h-1.5 w-1.5 rounded-full bg-[#98A2B3]" />}
+                        {step.clickable ? (
+                            // Completed/rejected stages open a read-only view of
+                            // that stage's documents and checklist.
+                            <button
+                                type="button"
+                                onClick={step.onClick}
+                                title={step.current
+                                    ? `Return to ${step.label}`
+                                    : `View ${step.label} (read-only)`}
+                                className="flex w-14 shrink-0 cursor-pointer flex-col items-center gap-1.5 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                            >
+                                <StepContent step={step} />
+                            </button>
+                        ) : (
+                            <div className="flex w-14 shrink-0 flex-col items-center gap-1.5">
+                                <StepContent step={step} />
                             </div>
-                            <span className={`w-full truncate text-center text-[10px]/[12px] font-medium ${
-                                step.done
-                                    ? "text-ink"
-                                    : step.current
-                                        ? "text-accent"
-                                        : step.rejected
-                                            ? "text-[#D20019]"
-                                            : "text-ink-muted"
-                            }`}>
-                                {step.label}
-                            </span>
-                        </div>
+                        )}
                         {i < steps.length - 1 && (
                             <div className={`mt-[13px] h-[3px] w-4 shrink-0 rounded-full ${step.done ? "bg-primary" : "bg-line"}`} />
                         )}
@@ -218,15 +242,35 @@ function ProjectLifeCycle({
         selectedProject?.stages?.[0] ||
         null;
 
-    const stageIndex = projectStage?.stageOrder;
-    const stageTitle = projectStage?.stageName || getStage(stageIndex);
-    const checklistLength = projectStage?.checklist?.length || 0;
-    const required = projectStage?.checklist?.filter((item) => item.isRequired)?.length || 0;
-    const completed = projectStage?.checklist?.filter((item) => item.completed)?.length || 0;
-    const requiredDone =
-        projectStage?.checklist?.filter((item) => item.isRequired && item.completed)?.length || 0;
+    // Completed/previous stages can be opened from the stepper for a read-only
+    // review of their documents and checklist. Null = showing the current stage.
+    const [viewingStageOrder, setViewingStageOrder] = useState(null);
 
-    const requiredDocs = projectStage?.requiredDocs || [];
+    useEffect(() => {
+        setViewingStageOrder(null);
+    }, [selectedProject?.projectId, currentStageOrder]);
+
+    const viewingStage = viewingStageOrder
+        ? (Array.isArray(selectedProject?.stages)
+            ? selectedProject.stages.find((s) => s.stageOrder === viewingStageOrder)
+            : null) ?? null
+        : null;
+
+    const isViewingPrevious = Boolean(viewingStage);
+
+    // Everything below renders the stage on screen: the current stage by
+    // default, or the historical stage picked in the stepper.
+    const activeStage = viewingStage ?? projectStage;
+
+    const stageIndex = activeStage?.stageOrder;
+    const stageTitle = activeStage?.stageName || getStage(stageIndex);
+    const checklistLength = activeStage?.checklist?.length || 0;
+    const required = activeStage?.checklist?.filter((item) => item.isRequired)?.length || 0;
+    const completed = activeStage?.checklist?.filter((item) => item.completed)?.length || 0;
+    const requiredDone =
+        activeStage?.checklist?.filter((item) => item.isRequired && item.completed)?.length || 0;
+
+    const requiredDocs = activeStage?.requiredDocs || [];
     const docsUploaded = requiredDocs.filter(
         (doc) => doc.status === "UPLOADED" || doc.status === "VERIFIED"
     ).length;
@@ -242,9 +286,11 @@ function ProjectLifeCycle({
 
     const steps = allStages.length
         ? allStages.map((s) => {
+            const isCurrentStage = s.stageOrder === currentStageOrder;
             const done = isStageDone(s);
             const rejected = s.workflowStatus === "REJECTED";
-            const current = s.stageOrder === currentStageOrder && !done && !rejected;
+            const current = isCurrentStage && !done && !rejected;
+            const viewed = viewingStageOrder === s.stageOrder;
             return {
                 order: s.stageOrder,
                 label: s.stageName || getStage(s.stageOrder),
@@ -252,13 +298,28 @@ function ProjectLifeCycle({
                 rejected,
                 current,
                 pending: !done && !rejected && !current,
-                dotClass: done
-                    ? "bg-primary"
-                    : rejected
-                        ? "bg-[#D20019]"
-                        : current
-                            ? "bg-surface ring-2 ring-accent"
-                            : "bg-line-soft",
+                // Finished stages open a read-only review; the current stage is
+                // always clickable so a read-only review can be left again (a
+                // rejected current stage is clickable for the same reason).
+                clickable: done || rejected || current,
+                viewed,
+                onClick: () => {
+                    if (isCurrentStage) {
+                        // Return to the live, editable view of the current stage.
+                        setViewingStageOrder(null);
+                    } else if (done || rejected) {
+                        setViewingStageOrder(s.stageOrder);
+                    }
+                },
+                dotClass: viewed
+                    ? "bg-surface ring-2 ring-accent"
+                    : done
+                        ? "bg-primary"
+                        : rejected
+                            ? "bg-[#D20019]"
+                            : current
+                                ? "bg-surface ring-2 ring-accent"
+                                : "bg-line-soft",
             };
         })
         : Object.entries(STAGES).map(([order, label]) => ({
@@ -268,6 +329,9 @@ function ProjectLifeCycle({
             rejected: false,
             current: Number(order) === (currentStageOrder || 1),
             pending: true,
+            clickable: false,
+            viewed: false,
+            onClick: undefined,
             dotClass: "bg-line-soft",
         }));
 
@@ -277,14 +341,18 @@ function ProjectLifeCycle({
             ? Math.round((doneStages / allStages.length) * 100)
             : Math.round(Number(selectedProject?.progressPercent) || 0);
 
-    const isCompleted = projectStage?.workflowStatus === "COMPLETED";
+    const isCompleted = activeStage?.workflowStatus === "COMPLETED";
     const isManager = user?.role === "PROJECTMANAGER";
     const isHeadOfOps = user?.role === "HEADOFOPS";
 
-    const isRejected = projectStage?.workflowStatus === "REJECTED";
+    // Checklist toggling is a live-stage action only — reviewing a completed
+    // stage is strictly read-only.
+    const canToggleChecklist = isManager && !isViewingPrevious;
+
+    const isRejected = activeStage?.workflowStatus === "REJECTED";
     const rejectionReason =
         selectedProject?.approvals?.find(
-            (approval) => approval.stage === projectStage?.stageOrder
+            (approval) => approval.stage === activeStage?.stageOrder
         )?.comment || "";
 
     const actionMap = {
@@ -497,7 +565,7 @@ function ProjectLifeCycle({
                         <span className="text-[11px]/[14px] font-semibold uppercase tracking-wider text-white/60">
                             Stage {stageIndex} of {allStages.length}
                         </span>
-                        <WorkflowBadge status={projectStage?.workflowStatus} />
+                        <WorkflowBadge status={activeStage?.workflowStatus} />
                     </div>
                     <h3 className="mt-2 text-[18px]/[24px] font-semibold text-white">{stageTitle}</h3>
                     <p className="mt-1 text-[13px]/[18px] text-white/70">{desc}</p>
@@ -524,7 +592,7 @@ function ProjectLifeCycle({
                             />
                         </div>
                     </div>
-                    {nextStage && (
+                    {!isViewingPrevious && nextStage && (
                         <div className="flex shrink-0 items-center gap-1.5 rounded-full bg-line px-2.5 py-1">
                             <span className="text-[11px]/[14px] font-medium text-ink-muted">Next</span>
                             <FaArrowRight className="h-2.5 w-2.5 text-ink-muted" />
@@ -548,9 +616,9 @@ function ProjectLifeCycle({
                             <p className="mt-1 text-[13px]/[18px] text-[#912018]">
                                 {rejectionReason || "The Head of Operations rejected this stage signoff. Address the feedback and resubmit."}
                             </p>
-                            {projectStage?.rejectedAt && (
+                            {activeStage?.rejectedAt && (
                                 <p className="mt-1.5 text-[12px]/[16px] text-[#B42318]/70">
-                                    Rejected on {new Date(projectStage.rejectedAt).toLocaleDateString("en-GB", {
+                                    Rejected on {new Date(activeStage.rejectedAt).toLocaleDateString("en-GB", {
                                         day: "numeric",
                                         month: "short",
                                         year: "numeric",
@@ -559,6 +627,32 @@ function ProjectLifeCycle({
                             )}
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Read-only banner while reviewing a completed/previous stage */}
+            {isViewingPrevious && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#B2DDFF] bg-[#F0F9FF] p-4 shadow-card">
+                    <div className="flex items-start gap-3">
+                        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#E0F2FE] text-[#175CD3]">
+                            <FaRegEye className="h-4 w-4" />
+                        </span>
+                        <div>
+                            <h4 className="text-[14px]/[20px] font-semibold text-[#175CD3]">
+                                Viewing {stageTitle} — read-only
+                            </h4>
+                            <p className="mt-1 text-[13px]/[18px] text-[#475467]">
+                                This lifecycle stage is locked. Return to the current stage to make changes.
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setViewingStageOrder(null)}
+                        className="shrink-0 rounded-lg bg-[#1B3C4A] px-4 py-2.5 text-[13px]/[18px] font-semibold text-white transition-colors hover:bg-[#092b3a] cursor-pointer"
+                    >
+                        Return to current stage
+                    </button>
                 </div>
             )}
 
@@ -584,11 +678,12 @@ function ProjectLifeCycle({
                                 docName={doc.fileName}
                                 docURL={doc.fileURL}
                                 projectId={selectedProject?.projectId}
-                                stageId={projectStage?.id}
+                                stageId={activeStage?.id}
                                 user={user}
                                 setProjects={setProjects}
                                 setSelectedProject={setSelectedProject}
                                 showNotification={showNotification}
+                                viewOnly={isViewingPrevious}
                             />
                         ))}
                     </div>
@@ -608,37 +703,37 @@ function ProjectLifeCycle({
                     </p>
                 ) : (
                     <div className="flex flex-col gap-2">
-                        {projectStage.checklist.map((item) => (
+                        {activeStage.checklist.map((item) => (
                             <div
                                 key={item.id}
                                 role="button"
-                                tabIndex={isManager ? 0 : -1}
+                                tabIndex={canToggleChecklist ? 0 : -1}
                                 onClick={() =>
-                                    isManager &&
+                                    canToggleChecklist &&
                                     toggleChecklist(
                                         setProjects,
                                         setSelectedProject,
                                         selectedProject?.projectId,
-                                        projectStage?.id,
+                                        activeStage?.id,
                                         item.id,
                                         user
                                     )
                                 }
                                 onKeyDown={(e) => {
-                                    if (isManager && (e.key === "Enter" || e.key === " ")) {
+                                    if (canToggleChecklist && (e.key === "Enter" || e.key === " ")) {
                                         e.preventDefault();
                                         toggleChecklist(
                                             setProjects,
                                             setSelectedProject,
                                             selectedProject?.projectId,
-                                            projectStage?.id,
+                                            activeStage?.id,
                                             item.id,
                                             user
                                         );
                                     }
                                 }}
                                 className={`group flex items-center justify-between gap-3 rounded-xl border border-line bg-surface px-3.5 py-3 transition-all ${
-                                    isManager
+                                    canToggleChecklist
                                         ? "cursor-pointer hover:border-primary/25 hover:shadow-card"
                                         : "cursor-default"
                                 }`}
@@ -672,7 +767,7 @@ function ProjectLifeCycle({
             </div>
 
             {/* Actions */}
-            {isManager && (
+            {isManager && !isViewingPrevious && (
                 <div className="rounded-2xl border border-line bg-surface p-4 shadow-card">
                     <button
                         onClick={handleWorkflowAction}
@@ -713,7 +808,7 @@ function ProjectLifeCycle({
                 </div>
             )}
 
-            {isHeadOfOps && (
+            {isHeadOfOps && !isViewingPrevious && (
                 <div className="rounded-2xl border border-line bg-surface p-4 shadow-card">
                     {isCompleted ? (
                         <button

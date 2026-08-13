@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 
-const ACCEPTED = ".pdf,image/svg+xml,image/jpeg"
+const ACCEPTED = ".pdf,image/svg+xml,image/jpeg,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 function SubmitProofModal({ task, onCancel, onSubmit }) {
     const [file, setFile] = useState(null)
@@ -60,7 +60,7 @@ function SubmitProofModal({ task, onCancel, onSubmit }) {
                         {file ? file.name : "Click to upload proof document"}
                     </span>
                     <span className='font-normal text-[12px]/[18px] text-[#636363]'>
-                        PDF, JPG, or SVG · max 5MB
+                        PDF, JPG, SVG, or XLSX · max 5MB
                     </span>
                 </button>
 

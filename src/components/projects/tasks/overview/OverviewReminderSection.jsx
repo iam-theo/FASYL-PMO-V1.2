@@ -2,7 +2,7 @@ import { getReminders, dismissReminder } from "../../../../api"
 import { useState, useEffect, useCallback } from "react";
 import { useRealtimeModule } from "../../../../realtimeData";
 
-function OverviewReminderSection({ onNavigate }) {
+function OverviewReminderSection({ project, onNavigate }) {
 
     const [reminders, setReminders] = useState([]);
     const [dismissingId, setDismissingId] = useState(null);
@@ -12,11 +12,21 @@ function OverviewReminderSection({ onNavigate }) {
     const loadReminders = useCallback(async () => {
         try {
             const response = await getReminders();
-            setReminders(Array.isArray(response.data) ? response.data : []);
+            const all = Array.isArray(response.data) ? response.data : [];
+
+            // This section lives inside a project's overview, so only reminders
+            // belonging to THIS project belong here. /reminders/my returns every
+            // reminder for the user across all projects.
+            const projectId = project?.projectId;
+            const scoped = projectId
+                ? all.filter((reminder) => reminder?.project?.projectId === projectId)
+                : all;
+
+            setReminders(scoped);
         } catch (err) {
             console.error(err);
         }
-    }, []);
+    }, [project?.projectId]);
 
     useEffect(() => {
         loadReminders();

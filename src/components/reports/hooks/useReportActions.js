@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Download, Eye, Link, Pencil, Trash2 } from 'lucide-react';
 import { REPORTS_ROUTES } from '../constants/routes.constants';
 import { TOAST_MESSAGES } from '../constants/messages.constants';
+import { getCurrentUserId } from '../services/reportService';
 import { buildShareUrl, copyToClipboard } from '../utils/download';
 import { getDownloadLabel } from '../utils/reportFile';
 import { useToast } from '../components/ui/Toast';
@@ -29,12 +30,27 @@ export const useReportActions = (report, { onView, onEdit, onDelete }) => {
       else toast.error('The link could not be copied. Copy it from the address bar instead.');
     };
 
+    // Only the author may edit or delete a report — the server rejects anyone
+    // else, so the menu must not offer those actions in the first place.
+    const currentUserId = getCurrentUserId();
+    const isOwner =
+      report?.createdById != null && report.createdById === currentUserId;
+
     return [
       { label: 'View details', icon: Eye, onClick: () => onView(report) },
-      { label: 'Edit report', icon: Pencil, onClick: () => onEdit(report) },
+      ...(isOwner
+        ? [
+            { label: 'Edit report', icon: Pencil, onClick: () => onEdit(report) },
+            {
+              label: 'Delete report',
+              icon: Trash2,
+              tone: 'danger',
+              onClick: () => onDelete(report),
+            },
+          ]
+        : []),
       { label: getDownloadLabel(report), icon: Download, onClick: () => download(report) },
       { label: 'Copy link', icon: Link, onClick: copyLink },
-      { label: 'Delete report', icon: Trash2, tone: 'danger', onClick: () => onDelete(report) },
     ];
   }, [report, onView, onEdit, onDelete, toast, download]);
 };

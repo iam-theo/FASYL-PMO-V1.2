@@ -14,6 +14,7 @@ import {
   notifyProjectAssignment,
   notifyProjectUnassigned,
   notifyResourceAssigned,
+  notifyResourceRemoved,
 } from "../notifications/notification.service.js";
 import { storeUploadedFile } from "../../utils/upload.service.js";
 
@@ -178,11 +179,26 @@ export const removeProjectResource = async (req, res) => {
   try {
     const { projectId, recordId } = req.params;
 
-    const project = await removeResourceFromProjectService(
-      projectId,
-      recordId,
-      req.user,
-    );
+    const { project, removedResource } =
+      await removeResourceFromProjectService(
+        projectId,
+        recordId,
+        req.user,
+      );
+
+    // The removed staff member should learn they are no longer on the project.
+    if (removedResource?.email) {
+      notifyResourceRemoved({
+        project,
+        resource: removedResource,
+        removedBy: req.user,
+      }).catch((error) => {
+        console.error(
+          "Resource removal notification failed:",
+          error.message,
+        );
+      });
+    }
 
     return res.status(200).json({
       success: true,

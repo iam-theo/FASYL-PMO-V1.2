@@ -389,7 +389,7 @@ function CreateTaskModal({
                                 ref={fileInputRef}
                                 type="file"
                                 className='hidden'
-                                accept="image/svg+xml,image/jpeg,application/pdf"
+                                accept="image/svg+xml,image/jpeg,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                                 onChange={handleFileChange}
                             />
 

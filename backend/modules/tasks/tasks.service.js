@@ -784,16 +784,25 @@ export const updateTaskService = async (
         }
     });
 
-    // Replace the join rows when the resource set changed.
-    const previousResourceIds = Array.isArray(task.assignedResources)
-        ? task.assignedResources.map((assignment) => assignment.resourceId)
-        : previousAssignedResourceId
-            ? [previousAssignedResourceId]
-            : [];
+    // A task's assignment lives in two places: the legacy assignedResourceId
+    // column and the TaskResource join table. Either source can be empty on its
+    // own (older rows only carry the column, newer paths only the join rows),
+    // so compare the UNION of both. Comparing a single source makes every
+    // status-only update look like a reassignment whenever the other source is
+    // empty — which fires a spurious "task assigned" notification.
+    const previousResourceIds = Array.from(new Set([
+        ...(Array.isArray(task.assignedResources)
+            ? task.assignedResources.map((assignment) => assignment.resourceId)
+            : []),
+        ...(previousAssignedResourceId ? [previousAssignedResourceId] : []),
+    ]));
 
-    const currentResourceIds =
-        newAssignedResourceIds ||
-        (updatedTask.assignedResourceId ? [updatedTask.assignedResourceId] : []);
+    const currentResourceIds = Array.from(new Set([
+        ...(newAssignedResourceIds || []),
+        ...(updatedTask.assignedResourceId
+            ? [updatedTask.assignedResourceId]
+            : []),
+    ]));
 
     const resourceSetChanged =
         previousResourceIds.length !== currentResourceIds.length ||
@@ -892,21 +901,48 @@ export const updateTaskService = async (
             });
         }
 
-        // The PM confirmed the completion — let the assignee know.
-        if (confirmed && updatedTask.assignedToUserId) {
-            createInAppNotification({
-                userId: updatedTask.assignedToUserId,
-                projectId: projectInfo?.projectId ?? null,
-                type: "TASK_COMPLETION_CONFIRMED",
-                title: "Task confirmed complete",
-                message: `Your task "${updatedTask.title}" was confirmed complete.`,
-                data: {
-                    projectId: projectInfo?.projectId ?? null,
-                    projectName: projectInfo?.projectName ?? null,
-                    taskId,
-                    taskTitle: updatedTask.title
+        // The PM confirmed the completion — let the assignee know. Staff tasks
+        // are assigned via project resources (assignedToUserId is null), so
+        // resolve the staff account through the resource's email when there is
+        // no direct user id.
+        if (confirmed) {
+            let assigneeUserId = updatedTask.assignedToUserId;
+
+            if (!assigneeUserId) {
+                const projectResources = Array.isArray(updatedTask.project?.resources)
+                    ? updatedTask.project.resources
+                    : [];
+
+                const recordId = updatedTask.assignedResourceId;
+                const resource = recordId
+                    ? findResourceAssignee(projectResources, recordId)
+                    : null;
+
+                if (resource?.email) {
+                    const account = await prisma.user.findUnique({
+                        where: { email: resource.email },
+                        select: { id: true }
+                    });
+
+                    if (account) assigneeUserId = account.id;
                 }
-            });
+            }
+
+            if (assigneeUserId) {
+                createInAppNotification({
+                    userId: assigneeUserId,
+                    projectId: projectInfo?.projectId ?? null,
+                    type: "TASK_COMPLETION_CONFIRMED",
+                    title: "Task confirmed complete",
+                    message: `Your task "${updatedTask.title}" was confirmed complete.`,
+                    data: {
+                        projectId: projectInfo?.projectId ?? null,
+                        projectName: projectInfo?.projectName ?? null,
+                        taskId,
+                        taskTitle: updatedTask.title
+                    }
+                });
+            }
         }
     }
 

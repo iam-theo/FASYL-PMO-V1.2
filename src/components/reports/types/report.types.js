@@ -34,6 +34,8 @@
  * @property {IsoDateString|null} periodStart
  * @property {IsoDateString|null} periodEnd
  * @property {IsoDateString} generatedAt
+ * @property {IsoDateString|null} createdAt
+ * @property {IsoDateString|null} updatedAt
  */
 
 /**

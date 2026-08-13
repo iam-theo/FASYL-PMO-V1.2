@@ -19,7 +19,7 @@ import { compareIds, toArray, toSearchToken } from './normalize';
  * way, so nothing above this file changes.
  */
 
-const DATE_FIELDS = new Set(['generatedAt', 'periodStart', 'periodEnd']);
+const DATE_FIELDS = new Set(['generatedAt', 'updatedAt', 'periodStart', 'periodEnd']);
 
 /**
  * Per-report search haystack, computed once and remembered.
