@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import {  PlusCircleIcon } from '../icons'
 import KanbanColumn from './KanbanColumn'
 import { STATUS_COLUMNS } from './kanbanConstants'
@@ -22,20 +22,14 @@ function KanbanTab({
         return grouped
     }, [filteredTasks])
 
-    const handleMove = async (taskId, direction) => {
+    const [draggingTaskId, setDraggingTaskId] = useState(null)
+
+    // Shared status-change core: optimistic update, persist, roll back on failure.
+    // Used by both the arrow buttons and drag-and-drop.
+    const moveTaskToStatus = async (taskId, newStatus) => {
         const task = tasks.find((t) => t.id === taskId);
 
-        if (!task) return;
-
-        const currentIndex = STATUS_COLUMNS.findIndex(
-            (column) => column.key === task.status
-        );
-
-        const nextIndex = currentIndex + direction;
-
-        if (nextIndex < 0 || nextIndex >= STATUS_COLUMNS.length) return;
-
-        const newStatus = STATUS_COLUMNS[nextIndex].key;
+        if (!task || task.status === newStatus) return;
 
         // Save current state
         const previousTasks = tasks;
@@ -56,8 +50,6 @@ function KanbanTab({
 
             const updatedTask = response.data;
 
-            console.log("updatedTask", updatedTask);
-
             setTasks((prev) =>
                 prev.map((task) =>
                     task.id === updatedTask.id ? updatedTask : task
@@ -69,6 +61,31 @@ function KanbanTab({
             // Roll back if the request failed
             setTasks(previousTasks);
         }
+    };
+
+    const handleMove = (taskId, direction) => {
+        const task = tasks.find((t) => t.id === taskId);
+
+        if (!task) return;
+
+        const currentIndex = STATUS_COLUMNS.findIndex(
+            (column) => column.key === task.status
+        );
+
+        const nextIndex = currentIndex + direction;
+
+        if (nextIndex < 0 || nextIndex >= STATUS_COLUMNS.length) return;
+
+        moveTaskToStatus(taskId, STATUS_COLUMNS[nextIndex].key);
+    };
+
+    const handleDropTask = (columnKey) => {
+        if (!draggingTaskId) return;
+
+        const taskId = draggingTaskId;
+        setDraggingTaskId(null);
+
+        moveTaskToStatus(taskId, columnKey);
     };
 
     return (
@@ -87,6 +104,9 @@ function KanbanTab({
                                 onMove={handleMove}
                                 updatePriority={updatePriority}
                                 onDelete={(task) => setDeleteTarget({ ids: [task.id] })}
+                                onDropTask={handleDropTask}
+                                onDragStart={setDraggingTaskId}
+                                onDragEnd={() => setDraggingTaskId(null)}
                             />
                         ))}
                     </div>
