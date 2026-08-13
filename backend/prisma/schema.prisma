@@ -330,17 +330,6 @@ model AuditLog {
   @@index([createdAt])
 }
 
-model TaskResource {
-  id         Int      @id @default(autoincrement())
-  taskId     Int
-  resourceId String
-  createdAt  DateTime @default(now())
-  Task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-
-  @@unique([taskId, resourceId])
-  @@index([resourceId])
-}
-
 enum ApprovalStatus {
   PENDING
   SUBMITTED
