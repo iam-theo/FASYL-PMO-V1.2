@@ -21,6 +21,24 @@ const prisma = new PrismaClient();
 //     return remindAt;
 // };
 
+const normalizeResourceIdList = (value) => {
+    if (value === undefined || value === null) return [];
+
+    const items = Array.isArray(value)
+        ? value
+        : typeof value === "string"
+            ? value.split(",")
+            : [value];
+
+    return items
+        .flatMap((item) => {
+            if (Array.isArray(item)) return item;
+            return String(item).trim();
+        })
+        .filter((item) => item !== undefined && item !== null && String(item).trim() !== "")
+        .map((item) => String(item).trim());
+};
+
 export const createTaskService = async (body, user, document = null) => {
 
     const {
@@ -106,11 +124,7 @@ export const createTaskService = async (body, user, document = null) => {
 
     if(role === ROLES.PROJECTMANAGER) {
 
-        const rawResourceIds = Array.isArray(assignedResourceIds)
-            ? assignedResourceIds
-            : assignedResourceId
-                ? [assignedResourceId]
-                : [];
+        const rawResourceIds = normalizeResourceIdList(assignedResourceIds ?? assignedResourceId);
 
         const requestedIds = rawResourceIds
             .filter((id) => id !== undefined && id !== null && String(id).trim() !== "")
@@ -587,11 +601,9 @@ export const updateTaskService = async (
         user.role === ROLES.PROJECTMANAGER &&
         (body.assignedResourceIds !== undefined || body.assignedResourceId !== undefined)
     ) {
-        const rawResourceIds = Array.isArray(body.assignedResourceIds)
-            ? body.assignedResourceIds
-            : body.assignedResourceId
-                ? [body.assignedResourceId]
-                : [];
+        const rawResourceIds = normalizeResourceIdList(
+            body.assignedResourceIds ?? body.assignedResourceId
+        );
 
         const requestedIds = rawResourceIds
             .filter((id) => id !== undefined && id !== null && String(id).trim() !== "")

@@ -298,6 +298,21 @@ export const rejectStage = async (projectId, stageOrder, reason) => {
   }
 };
 
+const appendFormDataValue = (formData, key, value) => {
+  if (value === undefined || value === null) return;
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => {
+      if (item !== undefined && item !== null) {
+        formData.append(key, item);
+      }
+    });
+    return;
+  }
+
+  formData.append(key, value);
+};
+
 export const createTask = async (payload) => {
   try {
     const { document, ...taskFields } = payload;
@@ -311,9 +326,15 @@ export const createTask = async (payload) => {
       const formData = new FormData();
 
       Object.entries(taskFields).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          formData.append(key, value);
+
+        if (value === undefined || value === null) return;
+
+        if (Array.isArray(value)) {
+          value.forEach((item) => formData.append(key, item));
+          return;
         }
+
+        formData.append(key, value);
       });
 
       formData.append("file", document);
@@ -354,9 +375,7 @@ export const updateTask = async (taskId, payload) => {
       const formData = new FormData();
 
       Object.entries(payload).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          formData.append(key, value);
-        }
+        appendFormDataValue(formData, key, value);
       });
 
       request = formData;

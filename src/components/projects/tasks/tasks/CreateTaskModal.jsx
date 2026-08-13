@@ -197,6 +197,7 @@ function CreateTaskModal({
             payload.assignedResourceIds = form.assignedResourceIds;
         }
 
+        console.log(payload);
         await onCreate(payload);
 
     }
