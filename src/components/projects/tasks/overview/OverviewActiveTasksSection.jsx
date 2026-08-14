@@ -8,7 +8,12 @@ import { useState } from 'react'
 const PREVIEW_COUNT = 5
 
 function OverviewActiveTasksSection({ tasks = [], setTasks, onSeeAll, onNavigate, readOnly = false, viewOnly = false }) {
-    const previewTasks = tasks.slice(0, PREVIEW_COUNT)
+    // "Active" means not finished: tasks that are Done (or Cancelled) belong
+    // in the completed history, not on the overview's active board.
+    const activeTasks = tasks.filter(
+        (task) => task?.status !== "DONE" && task?.status !== "CANCELLED"
+    );
+    const previewTasks = activeTasks.slice(0, PREVIEW_COUNT)
     const effectiveReadOnly = readOnly || viewOnly
     const isClickable = typeof onNavigate === "function";
 

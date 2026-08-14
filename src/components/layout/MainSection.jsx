@@ -3,6 +3,8 @@ import Dashboard from './Dashboard'
 import Projects from '../projects/Projects'
 import ProjectWorkspace from '../projects/tasks/ProjectWorkspace'
 import AuditLogsPage from './AuditLogsPage'
+import UserManagement from './UserManagement'
+import SettingsPage from './SettingsPage'
 
 function MainSection({
     activeTab,
@@ -13,6 +15,7 @@ function MainSection({
     setProjects,
     projectManagers,
     user,
+    setUser,
     isLoading,
     setOpenProject,
     openProject,
@@ -20,6 +23,16 @@ function MainSection({
     activeSubTab,
     setActiveSubTab,
     }) {
+
+    // A successful password change returns the fresh user (mustChangePassword
+    // cleared) — persist it so the app-wide state and stored session agree.
+    const handlePasswordChanged = (updatedUser) => {
+        const stored = JSON.parse(localStorage.getItem("user") || "null") || {};
+        const next = { ...stored, ...updatedUser };
+        localStorage.setItem("user", JSON.stringify(next));
+        setUser(next);
+    };
+
 
     const [currentPage, setCurrentPage] = useState(1)
     const [value, setValue] = useState("")
@@ -82,6 +95,11 @@ function MainSection({
                     setSelectedProject={setSelectedProject}
                     setOpenProject={setOpenProject}
                     setActiveSubTab={setActiveSubTab}
+                    onOpenProjectsWithFilter={(status) => {
+                        setFilter(status || "all");
+                        setCurrentPage(1);
+                        setActiveTab("projects");
+                    }}
                 />
             )}
 
@@ -107,6 +125,17 @@ function MainSection({
 
             {activeTab === "audit" && openProject === false && user?.role === "HEADOFOPS" && (
                 <AuditLogsPage user={user} />
+            )}
+
+            {activeTab === "users" && openProject === false && user?.role === "HEADOFOPS" && (
+                <UserManagement />
+            )}
+
+            {activeTab === "settings" && openProject === false && (
+                <SettingsPage
+                    user={user}
+                    onPasswordChanged={handlePasswordChanged}
+                />
             )}
 
             {openProject === true && selectedProject?.projectManager && (

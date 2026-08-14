@@ -1,7 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
-  // "native" covers local dev / VPS; rhel-openssl-3.0.x matches Vercel's
-  // Amazon Linux 2023 function runtime so the engine binary exists in prod.
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
@@ -11,25 +9,29 @@ datasource db {
 }
 
 model User {
-  id               Int               @id @default(autoincrement())
-  fullName         String
-  email            String            @unique
-  password         String
-  role             Role              @default(STAFF)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  auditLogs        AuditLog[]
-  assignedProjects Project[]         @relation("ProjectManagerRelation")
-  timelineEntries  ProjectTimeline[] @relation("TimelineCreatedBy")
-  refreshTokens    RefreshToken[]
-  reminders        Reminder[]
-  approvedReports  Report[]          @relation("ReportApprover")
-  createdReports   Report[]          @relation("ReportCreator")
-  createdTasks     Task[]            @relation("TaskAssigner")
-  assignedTasks    Task[]            @relation("TaskAssignee")
-  ownedTasks       Task[]            @relation("TaskCreator")
-  approvals        ProjectApproval[]
-  notifications    Notification[]
+  id                  Int               @id @default(autoincrement())
+  fullName            String
+  email               String            @unique
+  password            String
+  role                Role              @default(STAFF)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  mustChangePassword  Boolean           @default(false)
+  failedLoginAttempts Int               @default(0)
+  lockedUntil         DateTime?
+  deletedAt           DateTime?
+  auditLogs           AuditLog[]
+  assignedProjects    Project[]         @relation("ProjectManagerRelation")
+  timelineEntries     ProjectTimeline[] @relation("TimelineCreatedBy")
+  refreshTokens       RefreshToken[]
+  reminders           Reminder[]
+  approvedReports     Report[]          @relation("ReportApprover")
+  createdReports      Report[]          @relation("ReportCreator")
+  createdTasks        Task[]            @relation("TaskAssigner")
+  assignedTasks       Task[]            @relation("TaskAssignee")
+  ownedTasks          Task[]            @relation("TaskCreator")
+  notifications       Notification[]
+  approvals           ProjectApproval[]
 }
 
 model RefreshToken {
@@ -83,8 +85,8 @@ model Project {
   reminders         Reminder[]
   reports           Report[]
   tasks             Task[]
-  approvals         ProjectApproval[]
   notifications     Notification[]
+  approvals         ProjectApproval[]
 
   @@index([projectManagerId])
   @@index([status])
@@ -148,17 +150,17 @@ model ProjectApproval {
 }
 
 model Notification {
-  id        Int      @id @default(autoincrement())
+  id        Int       @id @default(autoincrement())
   userId    Int
   projectId String?
-  type      String   @default("GENERAL")
+  type      String    @default("GENERAL")
   title     String
   message   String?
   data      Json?
   readAt    DateTime?
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project   Project? @relation(fields: [projectId], references: [projectId], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  project   Project?  @relation(fields: [projectId], references: [projectId], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, readAt])
@@ -199,17 +201,17 @@ model Escalation {
 }
 
 model Task {
-  id                 Int           @id @default(autoincrement())
+  id                 Int            @id @default(autoincrement())
   stageId            Int?
   title              String
   description        String?
-  status             TaskStatus    @default(TODO)
-  priority           TaskPriority  @default(MEDIUM)
+  status             TaskStatus     @default(TODO)
+  priority           TaskPriority   @default(MEDIUM)
   startDate          DateTime?
   dueDate            DateTime?
   completedAt        DateTime?
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
   assignedById       Int
   createdById        Int
   projectId          Int
@@ -217,15 +219,27 @@ model Task {
   assignedToUserId   Int?
   documents          Json?
   reminders          Reminder[]
-  assignedBy         User          @relation("TaskAssigner", fields: [assignedById], references: [id])
-  assignedToUser     User?         @relation("TaskAssignee", fields: [assignedToUserId], references: [id])
-  createdBy          User          @relation("TaskCreator", fields: [createdById], references: [id])
-  project            Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  stage              ProjectStage? @relation(fields: [stageId], references: [id])
+  assignedBy         User           @relation("TaskAssigner", fields: [assignedById], references: [id])
+  assignedToUser     User?          @relation("TaskAssignee", fields: [assignedToUserId], references: [id])
+  createdBy          User           @relation("TaskCreator", fields: [createdById], references: [id])
+  project            Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  stage              ProjectStage?  @relation(fields: [stageId], references: [id])
+  assignedResources  TaskResource[]
 
   @@index([projectId])
   @@index([stageId])
   @@index([assignedToUserId])
+}
+
+model TaskResource {
+  id         Int      @id @default(autoincrement())
+  taskId     Int
+  resourceId String
+  createdAt  DateTime @default(now())
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, resourceId])
+  @@index([resourceId])
 }
 
 model Report {
@@ -240,16 +254,16 @@ model Report {
   status       ReportStatus  @default(DRAFT)
   content      Json?
   fileUrl      String?
-  format      String?
-  fileType    String?
   fileName     String?
   periodStart  DateTime?
   periodEnd    DateTime?
   submittedAt  DateTime?
   approvedAt   DateTime?
-  generatedAt DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+  fileType     String?
+  format       String?
+  generatedAt  DateTime?
   approvedBy   User?         @relation("ReportApprover", fields: [approvedById], references: [id])
   createdBy    User?         @relation("ReportCreator", fields: [createdById], references: [id])
   project      Project       @relation(fields: [projectId], references: [projectId], onDelete: Cascade)
@@ -347,9 +361,9 @@ enum TaskStatus {
   IN_PROGRESS
   IN_REVIEW
   BLOCKED
-  PENDING_CONFIRMATION
   DONE
   CANCELLED
+  PENDING_CONFIRMATION
 }
 
 enum TaskPriority {

@@ -1,5 +1,6 @@
 import { PrismaClient, WorkflowStatus } from "@prisma/client";
 import { getPolicy } from "../../modules/workflow/workflow.policy.js";
+import { createUserAccountService } from "../auth/auth.service.js";
 const prisma = new PrismaClient();
 // import axios from "axios";
 
@@ -272,11 +273,28 @@ export const assignProjectService = async (projectId, pmEmail) => {
 
   const existing = await prisma.project.findUnique({
     where: { id: projectId },
+    include: {
+      projectManager: {
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+        },
+      },
+    },
   });
 
   if (!existing) {
     throw new Error("Project not found");
   }
+
+  // Keep the previous manager so the caller can notify them that they have
+  // been unassigned when the project is handed over to someone else.
+  const previousManager =
+    existing.projectManager?.email &&
+    existing.projectManager.email.toLowerCase() !== String(pmEmail).toLowerCase()
+      ? existing.projectManager
+      : null;
 
   // Only bootstrap the workflow for brand-new (never-assigned) projects.
   // Reassignments keep the current stage so the project resumes exactly
@@ -342,7 +360,7 @@ export const assignProjectService = async (projectId, pmEmail) => {
 
       approvals: true,
     },
-  });
+  }).then((project) => ({ project, previousManager }));
 };
 
 /* =========================================
@@ -742,18 +760,26 @@ export const deleteProjectService = async (projectId) => {
 /* =========================================
     ADD RESOURCE TO PROJECT
 ========================================= */
-export const addResourceToProjectService = async (projectId, data) => {
+export const addResourceToProjectService = async (projectId, data, user) => {
   const project = await prisma.project.findUnique({
     where: { id: Number(projectId) },
   });
 
   if (!project) throw new Error("Project not found");
 
+  // Resource management is exclusive to the assigned project manager.
+  if (user?.role === "PROJECTMANAGER" && project.projectManagerId !== user.id) {
+    throw new Error(
+      "Only the assigned project manager can manage resources on this project"
+    );
+  }
+
   const resources = Array.isArray(project.resources) ? project.resources : [];
 
   const email = String(data.email || "").trim().toLowerCase();
   const staffId = String(data.staffId || "").trim();
   const recordId = String(data.recordId || `MAN-${Date.now()}`).trim();
+  const password = String(data.password || "").trim();
 
   const resource = {
     recordId,
@@ -763,7 +789,9 @@ export const addResourceToProjectService = async (projectId, data) => {
     phoneNumber: String(data.phoneNumber || "").trim(),
     staffId,
     designation: String(data.designation || "").trim(),
-    role: String(data.role || "").trim(),
+    // Resources added through the modal are staff by default; an explicit
+    // role (e.g. from a sales-sync payload) still wins.
+    role: String(data.role || "STAFF").trim(),
   };
 
   if (!resource.firstName || !resource.lastName) {
@@ -783,10 +811,83 @@ export const addResourceToProjectService = async (projectId, data) => {
     );
   }
 
+  // Dual-purpose flow: when a temporary password is supplied and the staff
+  // member has no account yet, create their STAFF account on the fly (flagged
+  // for a mandatory first-login password change) before assigning them. The
+  // password is never persisted on the project resource record.
+  let accountCreated = false;
+
+  if (password) {
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+
+    if (existingUser) {
+      throw new Error(
+        "An account already exists for this email — add the resource without a password"
+      );
+    }
+
+    const fullName = `${resource.firstName} ${resource.lastName}`.trim();
+
+    const created = await createUserAccountService({
+      fullName,
+      email,
+      password,
+      role: "STAFF",
+    });
+
+    if (!created?.id) {
+      throw new Error("Failed to create account for this staff member");
+    }
+
+    accountCreated = true;
+  }
+
   resources.push(resource);
 
-  return await prisma.project.update({
+  const updatedProject = await prisma.project.update({
     where: { id: project.id },
     data: { resources },
   });
+
+  return { project: updatedProject, resource, accountCreated };
+};
+
+/* =========================================
+    REMOVE RESOURCE FROM PROJECT
+========================================= */
+export const removeResourceFromProjectService = async (projectId, recordId, user) => {
+  const project = await prisma.project.findUnique({
+    where: { id: Number(projectId) },
+  });
+
+  if (!project) throw new Error("Project not found");
+
+  // Resource management is exclusive to the assigned project manager.
+  if (user?.role === "PROJECTMANAGER" && project.projectManagerId !== user.id) {
+    throw new Error(
+      "Only the assigned project manager can manage resources on this project"
+    );
+  }
+
+  const resources = Array.isArray(project.resources) ? project.resources : [];
+
+  const target = resources.find((r) => r.recordId === recordId);
+
+  if (!target) {
+    throw new Error("Resource not found on this project");
+  }
+
+  const remaining = resources.filter((r) => r.recordId !== recordId);
+
+  const updatedProject = await prisma.project.update({
+    where: { id: project.id },
+    data: { resources: remaining },
+  });
+
+  // Return the removed resource too so the caller can notify the staff member
+  // that they are no longer on this project.
+  return { project: updatedProject, removedResource: target };
 };

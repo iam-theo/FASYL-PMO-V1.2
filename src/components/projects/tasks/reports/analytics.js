@@ -211,6 +211,13 @@ export const getProjectTasks = (project, currentTasks = []) => {
 };
 
 export const resolveTaskAssignee = (task, resources = []) => {
+  if (Array.isArray(task?.assignees) && task.assignees.length > 0) {
+    return task.assignees
+      .map((assignee) => assignee?.fullName || assignee?.email)
+      .filter(Boolean)
+      .join(", ");
+  }
+
   const assignee = task?.assignee;
   if (assignee?.fullName) return assignee.fullName;
   if (task?.assignedToUser?.fullName) return task.assignedToUser.fullName;

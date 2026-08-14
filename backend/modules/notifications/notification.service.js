@@ -2,10 +2,7 @@ import { sendEmail, isEmailConfigured } from "../../utils/email.service.js";
 import { prisma } from "../../prisma/prisma.client.js";
 import { sendToUser } from "../realtime/realtime.service.js";
 
-const APP_BASE_URL =
-  process.env.APP_BASE_URL ||
-  process.env.PUBLIC_BASE_URL ||
-  "http://localhost:5173";
+const APP_BASE_URL = "http://localhost:5174";
 
 const SIGN_OFF_BUTTON_URL = `${APP_BASE_URL}/app`;
 
@@ -428,7 +425,9 @@ export const notifyStageSignoffReviewed = async ({
       title,
       message: approved
         ? `"${stageName}" was approved for ${projectName}.`
-        : `"${stageName}" was rejected for ${projectName}.`,
+        : `"${stageName}" was rejected for ${projectName}.${
+            reason ? ` Reason: ${reason}` : ""
+          }`,
       data: {
         projectId: project.projectId,
         projectName,
@@ -459,6 +458,290 @@ export const notifyStageSignoffReviewed = async ({
     });
   } catch (error) {
     console.error("❌ Signoff review notification failed:", error.message);
+  }
+};
+
+/**
+ * Emails a project manager that they have been unassigned from a project
+ * (e.g. reassigned to someone else), and creates an in-app notification for
+ * them. Never throws.
+ */
+export const notifyProjectUnassigned = async ({
+  project,
+  projectManager,
+  unassignedBy,
+}) => {
+  try {
+    if (!projectManager?.email) return;
+
+    const unassignerName =
+      unassignedBy?.fullName || unassignedBy?.email || "The operations team";
+
+    const detailsRows = [
+      ["Project", project.projectName],
+      ["Client", project.clientName || "—"],
+      ["Project ID", project.projectId || "—"],
+    ];
+
+    const title = "You have been unassigned from a project";
+    const greeting = `Hi ${formatAssigneeName(projectManager)},`;
+    const intro = `${unassignerName} removed you as the project manager for ${project.projectName} in the FASYL PMO portal.`;
+
+    const userId = await findUserIdForAssignee(projectManager);
+
+    if (userId) {
+      await createInAppNotification({
+        userId,
+        projectId: project.projectId || null,
+        type: "PROJECT_UNASSIGNED",
+        title,
+        message: `${unassignerName} unassigned you from ${project.projectName}.`,
+        data: {
+          projectId: project.projectId || null,
+          projectName: project.projectName,
+        },
+      });
+    }
+
+    await sendEmail({
+      to: projectManager.email,
+      subject: `[FASYL PMO] You have been unassigned: ${project.projectName}`,
+      text: toPlainText({ title, greeting, intro, detailsRows }),
+      html: buildLayout({
+        title,
+        greeting,
+        intro,
+        detailsRows,
+        buttonLabel: "Open portal",
+        buttonUrl: APP_BASE_URL,
+      }),
+    });
+  } catch (error) {
+    console.error("❌ Project unassignment notification failed:", error.message);
+  }
+};
+
+/**
+ * Emails a staff member that they were added as a resource to a project, and
+ * creates an in-app notification when the resource maps to a User account.
+ * When `temporaryPassword` is passed (an account was just created for them),
+ * it is included in the email with a first-login change notice. Never throws.
+ */
+export const notifyResourceAssigned = async ({
+  project,
+  resource,
+  assignedBy,
+  temporaryPassword,
+}) => {
+  try {
+    if (!resource?.email) return;
+
+    const assignerName =
+      assignedBy?.fullName || assignedBy?.email || "The project manager";
+
+    const accountCreated = Boolean(temporaryPassword);
+
+    const detailsRows = [
+      ["Project", project.projectName],
+      ["Client", project.clientName || "—"],
+      ["Project ID", project.projectId || "—"],
+      ["Designation", resource.designation || "—"],
+      ...(accountCreated
+        ? [
+            ["Account email", resource.email],
+            ["Temporary password", temporaryPassword],
+          ]
+        : []),
+    ];
+
+    const title = accountCreated
+      ? "Your account has been created and you are on a project"
+      : "You have been added to a project";
+    const greeting = `Hi ${formatAssigneeName(resource)},`;
+    const intro = accountCreated
+      ? `${assignerName} added you as a resource on ${project.projectName} in the FASYL PMO portal. A FASYL PMO account has been created for you — sign in with the temporary password below and change it when you first log in.`
+      : `${assignerName} added you as a resource on ${project.projectName} in the FASYL PMO portal.`;
+
+    const userId = await findUserIdForAssignee(resource);
+
+    if (userId) {
+      await createInAppNotification({
+        userId,
+        projectId: project.projectId || null,
+        type: "RESOURCE_ASSIGNED",
+        title,
+        message: `${assignerName} added you as a resource on ${project.projectName}.`,
+        data: {
+          projectId: project.projectId || null,
+          projectName: project.projectName,
+        },
+      });
+    }
+
+    await sendEmail({
+      to: resource.email,
+      subject: `[FASYL PMO] You have been added to a project: ${project.projectName}`,
+      text: toPlainText({ title, greeting, intro, detailsRows }),
+      html: buildLayout({
+        title,
+        greeting,
+        intro,
+        detailsRows,
+        buttonLabel: "Open project",
+        buttonUrl: APP_BASE_URL,
+      }),
+    });
+  } catch (error) {
+    console.error("❌ Resource assignment notification failed:", error.message);
+  }
+};
+
+/**
+ * Emails a staff member that they were removed as a resource from a project,
+ * and creates an in-app notification when the resource maps to a User account.
+ * Never throws.
+ */
+export const notifyResourceRemoved = async ({
+  project,
+  resource,
+  removedBy,
+}) => {
+  try {
+    if (!resource?.email) return;
+
+    const removerName =
+      removedBy?.fullName || removedBy?.email || "The project manager";
+
+    const detailsRows = [
+      ["Project", project.projectName],
+      ["Client", project.clientName || "—"],
+      ["Project ID", project.projectId || "—"],
+      ["Designation", resource.designation || "—"],
+    ];
+
+    const title = "You have been removed from a project";
+    const greeting = `Hi ${formatAssigneeName(resource)},`;
+    const intro = `${removerName} removed you as a resource on ${project.projectName} in the FASYL PMO portal.`;
+
+    const userId = await findUserIdForAssignee(resource);
+
+    if (userId) {
+      await createInAppNotification({
+        userId,
+        projectId: project.projectId || null,
+        type: "RESOURCE_REMOVED",
+        title,
+        message: `${removerName} removed you as a resource on ${project.projectName}.`,
+        data: {
+          projectId: project.projectId || null,
+          projectName: project.projectName,
+        },
+      });
+    }
+
+    await sendEmail({
+      to: resource.email,
+      subject: `[FASYL PMO] You have been removed from a project: ${project.projectName}`,
+      text: toPlainText({ title, greeting, intro, detailsRows }),
+      html: buildLayout({
+        title,
+        greeting,
+        intro,
+        detailsRows,
+        buttonLabel: "Open portal",
+        buttonUrl: APP_BASE_URL,
+      }),
+    });
+  } catch (error) {
+    console.error("❌ Resource removal notification failed:", error.message);
+  }
+};
+
+/**
+ * Emails a newly created PM/STAFF account its credentials. The temporary
+ * password is included alongside a first-login change notice. Never throws.
+ */
+export const notifyAccountCreated = async ({
+  user,
+  temporaryPassword,
+  createdBy,
+}) => {
+  try {
+    if (!user?.email) return;
+
+    const creatorName =
+      createdBy?.fullName || createdBy?.email || "The operations team";
+
+    const detailsRows = [
+      ["Email", user.email],
+      ["Role", user.role === "PROJECTMANAGER" ? "Project Manager" : "Staff"],
+      ["Temporary password", temporaryPassword || "—"],
+    ];
+
+    const title = "Your FASYL PMO account has been created";
+    const greeting = `Hi ${formatAssigneeName(user)},`;
+    const intro = `${creatorName} created a FASYL PMO account for you. Sign in with the temporary password below — you will be asked to change it the first time you log in.`;
+
+    await createInAppNotification({
+      userId: user.id,
+      projectId: null,
+      type: "ACCOUNT_CREATED",
+      title,
+      message:
+        "Your FASYL PMO account has been created. Change your password on first login.",
+      data: null,
+    });
+
+    await sendEmail({
+      to: user.email,
+      subject: "[FASYL PMO] Your account has been created",
+      text: toPlainText({ title, greeting, intro, detailsRows }),
+      html: buildLayout({
+        title,
+        greeting,
+        intro,
+        detailsRows,
+        buttonLabel: "Sign in",
+        buttonUrl: APP_BASE_URL,
+      }),
+    });
+  } catch (error) {
+    console.error("❌ Account creation notification failed:", error.message);
+  }
+};
+
+/**
+ * Emails a password reset link. Never throws.
+ */
+export const notifyPasswordReset = async ({ user, resetUrl }) => {
+  try {
+    if (!user?.email || !resetUrl) return;
+
+    const title = "Reset your FASYL PMO password";
+    const greeting = `Hi ${formatAssigneeName(user)},`;
+    const intro =
+      "We received a request to reset your FASYL PMO password. Use the link below — it expires in 30 minutes. If you did not request this, you can ignore this email.";
+
+    await sendEmail({
+      to: user.email,
+      subject: "[FASYL PMO] Reset your password",
+      text: toPlainText({
+        title,
+        greeting,
+        intro,
+        detailsRows: [["Reset link", resetUrl]],
+      }),
+      html: buildLayout({
+        title,
+        greeting,
+        intro,
+        detailsRows: [],
+        buttonLabel: "Reset password",
+        buttonUrl: resetUrl,
+      }),
+    });
+  } catch (error) {
+    console.error("❌ Password reset email failed:", error.message);
   }
 };
 

@@ -2,6 +2,10 @@ import { memo } from 'react';
 import PropTypes from 'prop-types';
 import { useReportActions } from '../../hooks/useReportActions';
 import { formatDate, formatDateRange } from '../../utils/date';
+
+/** "Modified" shows the last-edit time, and only once a report was actually edited. */
+const hasBeenModified = (report) =>
+  Boolean(report?.updatedAt && report?.updatedAt !== report?.createdAt);
 import { FormatBadge, ReportTypeBadge } from '../ui/Badge';
 import { DropdownMenu } from '../ui/DropdownMenu';
 
@@ -59,6 +63,10 @@ export const ReportTableRow = memo(({ report, onView, onEdit, onDelete, onPrefet
 
       <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-500">
         {formatDate(report.generatedAt)}
+      </td>
+
+      <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-500">
+        {hasBeenModified(report) ? formatDate(report.updatedAt) : '—'}
       </td>
 
       <td className="px-2 py-3 text-right">

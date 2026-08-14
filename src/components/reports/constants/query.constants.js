@@ -9,6 +9,7 @@ export const REPORT_SORT_FIELDS = Object.freeze({
   format: 'Format',
   projectId: 'Project',
   generatedAt: 'Generated',
+  updatedAt: 'Modified',
   periodStart: 'Period start',
   periodEnd: 'Period end',
 });

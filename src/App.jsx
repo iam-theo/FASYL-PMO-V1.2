@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { FaCheckCircle, FaExclamationCircle } from "react-icons/fa";
 import SignIn from "./components/auth/SignIn";
+import ResetPassword from "./components/auth/ResetPassword";
 import MainBody from "./components/layout/MainBody";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { useNotification } from "./components/NotificationContext";
@@ -20,7 +21,7 @@ function App() {
     <>
       {/* ============ NOTIFICATION UI ============ */}
       <div
-        className={`bg-[#FFFFFF] shadow-[#1018280D] shadow-md rounded-lg p-4 flex items-start justify-between gap-4 fixed z-4000 top-5 right-5 w-100 min-h-24.5 cursor-pointer transition-all duration-300 ease-in-out
+        className={`bg-[#FFFFFF] shadow-[#1018280D] shadow-md rounded-lg p-4 flex items-start justify-between gap-4 fixed z-6000 top-5 right-5 w-100 min-h-24.5 cursor-pointer transition-all duration-300 ease-in-out
           ${
             notification
               ? "opacity-100 translate-x-0 scale-100"
@@ -46,6 +47,9 @@ function App() {
 
       <Routes>
         <Route path="/" element={<SignIn setUser={setUser} />} />
+
+        {/* Landing page for the emailed password reset link. */}
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         <Route
           path="/app"

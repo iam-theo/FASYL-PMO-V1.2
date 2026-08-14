@@ -59,6 +59,14 @@ export const ReportCard = memo(({ report, onView, onEdit, onDelete, onPrefetch }
 
       <p className="mt-2 text-xs text-slate-400">
         Generated <time dateTime={report.generatedAt}>{formatRelativeTime(report.generatedAt)}</time>
+        {report.updatedAt && report.updatedAt !== report.createdAt && (
+          <>
+            {' · Modified '}
+            <time dateTime={report.updatedAt}>
+              {formatRelativeTime(report.updatedAt)}
+            </time>
+          </>
+        )}
       </p>
     </article>
   );

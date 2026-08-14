@@ -3,7 +3,9 @@ import { useMemo, useState } from "react";
 import ResourceCard from "./ResourceCard";
 import ExportMenu from "../ExportMenu";
 import AddResourceModal from "./AddResourceModal";
-// import RemoveResourceModal from './RemoveResourceModal'
+import RemoveResourceModal from "./RemoveResourceModal";
+import { removeProjectResource, api } from "../../../../api";
+import { useNotification } from "../../../NotificationContext";
 
 const ITEMS_PER_PAGE = 6;
 
@@ -20,7 +22,9 @@ function ResourcesTab({ project, onProjectUpdate, canManageResources = false }) 
 
   const [currentPage, setCurrentPage] = useState(1);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
-  // const [resourceToRemove, setResourceToRemove] = useState(null)
+  const [resourceToRemove, setResourceToRemove] = useState(null)
+  const [removing, setRemoving] = useState(false)
+  const { showNotification } = useNotification()
 
   const resources = useMemo(() => project?.resources || [], [project?.resources]);
 
@@ -33,6 +37,42 @@ function ResourcesTab({ project, onProjectUpdate, canManageResources = false }) 
 
   const handleResourceAdded = (updatedProject) => {
     onProjectUpdate?.(updatedProject);
+  };
+
+  const handleRemoveResource = async (resource) => {
+    if (removing) return;
+
+    try {
+      setRemoving(true);
+      const response = await removeProjectResource(project.id, resource.recordId);
+
+      let freshProject = response.data;
+
+      try {
+        const freshResponse = await api.get(`/projects/${project.projectId}`);
+        freshProject = freshResponse.data?.data ?? freshProject;
+      } catch (refetchErr) {
+        console.error(refetchErr);
+      }
+
+      setResourceToRemove(null);
+      onProjectUpdate?.(freshProject);
+
+      showNotification({
+        type: "success",
+        title: "Resource Removed!",
+        message: `${resource.firstName} ${resource.lastName} has been removed from ${project.projectName ?? "the project"}`
+      });
+    } catch (error) {
+      console.error(error);
+      showNotification({
+        type: "error",
+        title: "Failed To Remove Resource!",
+        message: error.response?.data?.error || "Unable to remove resource"
+      });
+    } finally {
+      setRemoving(false);
+    }
   };
 
   return (
@@ -72,17 +112,39 @@ function ResourcesTab({ project, onProjectUpdate, canManageResources = false }) 
 
       <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-4 py-4">
         {resources.length === 0 ? (
-          <div className="w-full py-20 text-center font-normal text-[14px]/[20px] text-[#636363]">
-            No resources assigned to this project yet.
-            {canManageResources && " Use the Add Resource button to add one."}
+          <div className="flex h-full w-full flex-col items-center justify-center gap-5 py-16">
+            <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1B3C4A] to-[#2E6B7E] text-[#FFFFFF] shadow-card-hover">
+              <i className="fa-solid fa-users text-[22px]"></i>
+            </span>
+            <div className="text-center">
+              <h3 className="text-[16px]/[24px] font-semibold text-ink">
+                No resources assigned yet
+              </h3>
+              <p className="mt-1 text-[13px]/[20px] text-ink-muted">
+                {canManageResources
+                  ? "Add staff from the directory to get this project moving."
+                  : "This project has no resources assigned yet."}
+              </p>
+            </div>
+            {canManageResources && (
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(true)}
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#1B3C4A] px-4 font-medium text-[13px]/[20px] text-[#FFFFFF] cursor-pointer hover:bg-[#16313D]"
+              >
+                <i className="fa-solid fa-plus text-[#FFFFFF]"></i>
+                Add Resource
+              </button>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {paginatedResources.map((resource) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            {paginatedResources.map((resource, index) => (
               <ResourceCard
                 key={resource.recordId}
                 resource={resource}
-                // onRemove={setResourceToRemove}
+                index={index}
+                onRemove={canManageResources ? setResourceToRemove : undefined}
               />
             ))}
           </div>
@@ -113,19 +175,20 @@ function ResourcesTab({ project, onProjectUpdate, canManageResources = false }) 
         </div>
       </div>
 
-      {/* {resourceToRemove && (
+      {resourceToRemove && (
                 <RemoveResourceModal
                     resource={resourceToRemove}
                     onCancel={() => setResourceToRemove(null)}
                     onConfirm={handleRemoveResource}
                 />
-            )} */}
+            )}
 
             {isAddModalOpen && (
                 <AddResourceModal
                     projectId={project.id}
                     projectCode={project.projectId}
                     projectName={project.projectName}
+                    existingEmails={(project.resources || []).map((r) => r.email)}
                     onClose={() => setIsAddModalOpen(false)}
                     onAdded={handleResourceAdded}
                 />

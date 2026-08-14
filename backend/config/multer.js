@@ -13,19 +13,20 @@ const storage = multer.memoryStorage();
 /* =========================
     FILE FILTER
 ========================= */
-// Mirrors the frontend allow-list (SVG, JPG, PDF) so validation is identical
-// on both sides.
+// Mirrors the frontend allow-list (SVG, JPG, PDF, XLSX) so validation is
+// identical on both sides.
 const fileFilter = (req, file, cb) => {
   const allowedTypes = [
     "application/pdf",
     "image/svg+xml",
     "image/jpeg",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   ];
 
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    const error = new Error("Invalid file type. Only SVG, JPG, or PDF allowed");
+    const error = new Error("Invalid file type. Only SVG, JPG, PDF, or XLSX allowed");
     error.code = "INVALID_FILE_TYPE";
     cb(error, false);
   }
@@ -56,7 +57,7 @@ const uploadSingleFile = (req, res, next) => {
     if (err?.code === "INVALID_FILE_TYPE") {
       return res.status(400).json({
         success: false,
-        message: err?.message || "Invalid file type. Only SVG, JPG, or PDF allowed",
+        message: err?.message || "Invalid file type. Only SVG, JPG, PDF, or XLSX allowed",
       });
     }
 
