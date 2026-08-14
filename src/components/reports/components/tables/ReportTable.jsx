@@ -71,6 +71,12 @@ export const ReportTable = ({
                 sort={sort}
                 onSortChange={onSortChange}
               />
+              <SortableColumnHeader
+                field="updatedAt"
+                label={REPORT_SORT_FIELDS.updatedAt}
+                sort={sort}
+                onSortChange={onSortChange}
+              />
               <th scope="col" className="w-12 px-2 py-2.5">
                 <span className="sr-only">Actions</span>
               </th>

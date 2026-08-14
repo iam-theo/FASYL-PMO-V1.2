@@ -48,6 +48,18 @@ const requireCurrentUserId = () => {
   return Number(id);
 };
 
+/**
+ * The signed-in user's id, or null when unavailable. The UI uses this to
+ * decide whether a report row was created by the current user before offering
+ * edit/delete — the server enforces the same rule.
+ * @returns {number|null}
+ */
+export const getCurrentUserId = () => {
+  const id = currentUserIdProvider?.();
+  if (id === null || id === undefined || Number.isNaN(Number(id))) return null;
+  return Number(id);
+};
+
 /** POST/PATCH can 404 on the project or the stage, not on the report itself. */
 const withReferenceErrors = (error) => {
   const apiError = toApiError(error);

@@ -71,6 +71,10 @@ export const toReport = (dto) => {
     periodEnd: toNullableString(raw.periodEnd),
     // `generatedAt` drives the default sort, so it must never be undefined.
     generatedAt: toNullableString(raw.generatedAt ?? raw.createdAt) ?? new Date().toISOString(),
+    // `createdAt` vs `updatedAt` tells the UI whether a report has ever been
+    // edited (Prisma touches `updatedAt` on every update).
+    createdAt: toNullableString(raw.createdAt),
+    updatedAt: toNullableString(raw.updatedAt),
   };
 };
 

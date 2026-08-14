@@ -215,26 +215,22 @@ model Task {
   assignedById       Int
   createdById        Int
   projectId          Int
-  // Primary resource (first selected) — kept for backward compatibility with
-  // existing consumers. All assigned resources live in TaskResource.
   assignedResourceId String?
   assignedToUserId   Int?
   documents          Json?
   reminders          Reminder[]
+  assignedBy         User           @relation("TaskAssigner", fields: [assignedById], references: [id])
+  assignedToUser     User?          @relation("TaskAssignee", fields: [assignedToUserId], references: [id])
+  createdBy          User           @relation("TaskCreator", fields: [createdById], references: [id])
+  project            Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  stage              ProjectStage?  @relation(fields: [stageId], references: [id])
   assignedResources  TaskResource[]
-  assignedBy         User          @relation("TaskAssigner", fields: [assignedById], references: [id])
-  assignedToUser     User?         @relation("TaskAssignee", fields: [assignedToUserId], references: [id])
-  createdBy          User          @relation("TaskCreator", fields: [createdById], references: [id])
-  project            Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  stage              ProjectStage? @relation(fields: [stageId], references: [id])
 
   @@index([projectId])
   @@index([stageId])
   @@index([assignedToUserId])
 }
 
-// A task can be assigned to more than one project resource. resourceId is the
-// recordId of the entry inside the project's resources array.
 model TaskResource {
   id         Int      @id @default(autoincrement())
   taskId     Int

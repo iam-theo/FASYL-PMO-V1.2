@@ -34,7 +34,7 @@ export const processFile = async (file, options = {}) => {
     if (!allowedTypes.includes(file.type)) {
         return {
             success: false,
-            error: "Only SVG, JPG, or PDF allowed"
+            error: "Only SVG, JPG, PDF, or XLSX allowed"
         };
     }
 

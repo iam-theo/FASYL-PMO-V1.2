@@ -15,7 +15,7 @@ import {
 
 function UploadBox({
     maxSizeMB = MAX_UPLOAD_MB,
-    formats = "SVG, JPG, PDF",
+    formats = "SVG, JPG, PDF, XLSX",
     title,
     docKey,
     docStatus,
@@ -25,7 +25,8 @@ function UploadBox({
     stageId,
     user,
     setProjects,
-    setSelectedProject
+    setSelectedProject,
+    viewOnly = false
 }) {
     const inputRef = useRef(null)
     const [isDragging, setIsDragging] = useState(false)
@@ -40,10 +41,17 @@ function UploadBox({
         setBusy(false)
     }, [docKey, stageId])
 
-    const allowedTypes = ["image/svg+xml", "image/jpeg", "application/pdf"]
+    const allowedTypes = [
+        "image/svg+xml",
+        "image/jpeg",
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ]
 
     const isManager = user?.role === "PROJECTMANAGER"
-    const isReadOnly = user?.role === "HEADOFOPS"
+    // HEADOOPS can never upload; viewOnly (e.g. reviewing a completed lifecycle
+    // stage) additionally freezes the box for everyone, including the manager.
+    const isReadOnly = user?.role === "HEADOFOPS" || viewOnly
 
     // Open file picker
     const handleClick = () => {
@@ -135,7 +143,7 @@ function UploadBox({
     };
 
     const handleSaveUpload = async () => {
-        if (!isManager || busy) return;
+        if (!isManager || isReadOnly || busy) return;
 
         const selected = uploadState[docKey]
 
@@ -214,7 +222,7 @@ function UploadBox({
     };
 
     const handleDeleteUpload = async () => {
-        if (!isManager || busy) return;
+        if (!isManager || isReadOnly || busy) return;
 
         setBusy(true)
 
@@ -376,7 +384,7 @@ function UploadBox({
                         ref={inputRef}
                         type="file"
                         className="hidden"
-                        accept="image/svg+xml,image/jpeg,application/pdf"
+                        accept="image/svg+xml,image/jpeg,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                         onChange={(e) => handleFileChange(e)}
                     />
                     <span className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
@@ -429,7 +437,7 @@ function UploadBox({
                             </button>
                         ) : null}
 
-                        {isManager && hasSelection && !isSaved && (
+                        {isManager && !isReadOnly && hasSelection && !isSaved && (
                             <>
                                 <button
                                     onClick={handleSaveUpload}
@@ -458,7 +466,7 @@ function UploadBox({
                             </>
                         )}
 
-                        {isManager && isSaved && (
+                        {isManager && !isReadOnly && isSaved && (
                             <button
                                 onClick={handleDeleteUpload}
                                 disabled={busy}

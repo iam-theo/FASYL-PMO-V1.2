@@ -597,6 +597,67 @@ export const notifyResourceAssigned = async ({
 };
 
 /**
+ * Emails a staff member that they were removed as a resource from a project,
+ * and creates an in-app notification when the resource maps to a User account.
+ * Never throws.
+ */
+export const notifyResourceRemoved = async ({
+  project,
+  resource,
+  removedBy,
+}) => {
+  try {
+    if (!resource?.email) return;
+
+    const removerName =
+      removedBy?.fullName || removedBy?.email || "The project manager";
+
+    const detailsRows = [
+      ["Project", project.projectName],
+      ["Client", project.clientName || "—"],
+      ["Project ID", project.projectId || "—"],
+      ["Designation", resource.designation || "—"],
+    ];
+
+    const title = "You have been removed from a project";
+    const greeting = `Hi ${formatAssigneeName(resource)},`;
+    const intro = `${removerName} removed you as a resource on ${project.projectName} in the FASYL PMO portal.`;
+
+    const userId = await findUserIdForAssignee(resource);
+
+    if (userId) {
+      await createInAppNotification({
+        userId,
+        projectId: project.projectId || null,
+        type: "RESOURCE_REMOVED",
+        title,
+        message: `${removerName} removed you as a resource on ${project.projectName}.`,
+        data: {
+          projectId: project.projectId || null,
+          projectName: project.projectName,
+        },
+      });
+    }
+
+    await sendEmail({
+      to: resource.email,
+      subject: `[FASYL PMO] You have been removed from a project: ${project.projectName}`,
+      text: toPlainText({ title, greeting, intro, detailsRows }),
+      html: buildLayout({
+        title,
+        greeting,
+        intro,
+        detailsRows,
+        buttonLabel: "Open portal",
+        buttonUrl: APP_BASE_URL,
+      }),
+    });
+  } catch (error) {
+    console.error("❌ Resource removal notification failed:", error.message);
+  }
+};
+
+/**
  * Emails a newly created PM/STAFF account its credentials. The temporary
  * password is included alongside a first-login change notice. Never throws.
  */

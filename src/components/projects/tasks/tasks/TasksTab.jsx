@@ -335,7 +335,7 @@ function TasksTab({
 
     const handleCreateTask = async (newTask) => {
 
-        // console.log("Received", newTask);
+        console.log("Received", newTask);
 
         try {
             const response = await createTask(newTask);

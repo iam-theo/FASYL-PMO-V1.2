@@ -882,8 +882,12 @@ export const removeResourceFromProjectService = async (projectId, recordId, user
 
   const remaining = resources.filter((r) => r.recordId !== recordId);
 
-  return await prisma.project.update({
+  const updatedProject = await prisma.project.update({
     where: { id: project.id },
     data: { resources: remaining },
   });
+
+  // Return the removed resource too so the caller can notify the staff member
+  // that they are no longer on this project.
+  return { project: updatedProject, removedResource: target };
 };
