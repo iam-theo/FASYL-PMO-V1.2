@@ -5,6 +5,7 @@ import App from "./App.jsx";
 import { NotificationProvider } from "./components/NotificationContext.jsx";
 
 import { configureReports } from "./components/reports";
+import { handleSessionExpired } from "./auth/session";
 
 const readUser = () => {
   try {
@@ -46,11 +47,7 @@ configureReports({
   onUnauthorized: () => {
     // Guarded: with no token we were never signed in, and wiping + reloading
     // here produces a redirect loop that looks like broken login.
-    if (!localStorage.getItem("token")) return;
-
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    window.location.assign("/");
+    handleSessionExpired();
   },
 });
 

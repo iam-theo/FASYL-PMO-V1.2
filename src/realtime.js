@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { handleSessionExpired } from "./auth/session";
 
 /**
  * Singleton WebSocket client for realtime server-push events.
@@ -103,6 +104,7 @@ const connect = () => {
     socket = null;
     if (event.code === 4401) {
       shouldReconnect = false;
+      handleSessionExpired();
       return;
     }
     scheduleReconnect();
