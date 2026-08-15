@@ -1,4 +1,5 @@
 import axios from "axios";
+import { handleSessionExpired, isLoginRequest } from "./auth/session";
 
 /**
  * The base URL was hard coded to localhost, which makes every non-local build
@@ -84,6 +85,11 @@ api.interceptors.response.use(
     if (!error.config?.skipLoader) {
       trackRequestEnd();
     }
+
+    if (error.response?.status === 401 && !isLoginRequest(error.config)) {
+      handleSessionExpired();
+    }
+
     return Promise.reject(error);
   },
 );
