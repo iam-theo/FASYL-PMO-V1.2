@@ -270,6 +270,32 @@ export const getStaffService = async () => {
 };
 
 /* =========================
+   ACCOUNT EXISTENCE CHECK
+========================= */
+// Used by the Add Resource flow to decide whether the picked staff member
+// already has a portal account. Checks every role (not just STAFF) so the
+// modal can disable the default-password field whenever an account exists.
+export const checkAccountByEmailService = async (email) => {
+  const normalized = String(email || "").trim().toLowerCase();
+
+  if (!normalized) {
+    return { exists: false, role: null };
+  }
+
+  const user = await prisma.user.findFirst({
+    where: {
+      email: { equals: normalized, mode: "insensitive" },
+      deletedAt: null,
+    },
+    select: { role: true },
+  });
+
+  return user
+    ? { exists: true, role: user.role }
+    : { exists: false, role: null };
+};
+
+/* =========================
    XNETT EMPLOYEE DIRECTORY
 ========================= */
 

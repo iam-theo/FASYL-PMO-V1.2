@@ -6,6 +6,7 @@ import {
   logout,
   getProjectManagers,
   getStaff,
+  checkAccount,
   signup,
   getXnetEmployees,
   createUserAccount,
@@ -254,6 +255,34 @@ router.get(
 router.get(
   "/staff",
   getStaff
+);
+
+/**
+ * @swagger
+ * /auth/check-account:
+ *   get:
+ *     summary: Check whether an email already has a portal account
+ *     description: Returns whether any non-deleted user (any role) exists for the given email. Used by the Add Resource flow to decide whether a default password is needed.
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: email
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Account existence result
+ *       500:
+ *         description: Server error
+ */
+router.get(
+  "/check-account",
+  authMiddleWare,
+  allowRoles(ROLES.PROJECTMANAGER, ROLES.HEADOFOPS),
+  checkAccount
 );
 
 /**

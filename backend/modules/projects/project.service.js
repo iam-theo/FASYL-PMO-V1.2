@@ -823,26 +823,26 @@ export const addResourceToProjectService = async (projectId, data, user) => {
       select: { id: true },
     });
 
-    if (existingUser) {
-      throw new Error(
-        "An account already exists for this email — add the resource without a password"
-      );
+    // The account already exists — nothing to create. The supplied password
+    // is never applied to the existing account; it is simply ignored so
+    // adding the resource still succeeds (the UI disables the password field
+    // for existing accounts, but this guards against stale/racing requests).
+    if (!existingUser) {
+      const fullName = `${resource.firstName} ${resource.lastName}`.trim();
+
+      const created = await createUserAccountService({
+        fullName,
+        email,
+        password,
+        role: "STAFF",
+      });
+
+      if (!created?.id) {
+        throw new Error("Failed to create account for this staff member");
+      }
+
+      accountCreated = true;
     }
-
-    const fullName = `${resource.firstName} ${resource.lastName}`.trim();
-
-    const created = await createUserAccountService({
-      fullName,
-      email,
-      password,
-      role: "STAFF",
-    });
-
-    if (!created?.id) {
-      throw new Error("Failed to create account for this staff member");
-    }
-
-    accountCreated = true;
   }
 
   resources.push(resource);

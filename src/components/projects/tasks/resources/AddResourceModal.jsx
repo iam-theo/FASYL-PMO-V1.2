@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { addProjectResource, api, getEmployees, getStaff } from '../../../../api'
+import { addProjectResource, api, checkAccountEmail, getEmployees, getStaff } from '../../../../api'
 import { useNotification } from '../../../NotificationContext'
 import EmployeeDirectoryPicker from '../../../layout/EmployeeDirectoryPicker'
 
@@ -19,6 +19,8 @@ function AddResourceModal({ projectId, projectCode, projectName, existingEmails 
     const [employeesLoading, setEmployeesLoading] = useState(true)
     const [registeredEmails, setRegisteredEmails] = useState([])
     const [selectedEmployee, setSelectedEmployee] = useState(null)
+    const [hasAccount, setHasAccount] = useState(false)
+    const [checkingAccount, setCheckingAccount] = useState(false)
     const { showNotification } = useNotification()
 
     // Two sources load in parallel:
@@ -79,13 +81,45 @@ function AddResourceModal({ projectId, projectCode, projectName, existingEmails 
         [registeredEmails]
     );
 
-    // The picked employee's email decides whether an account already exists.
-    const selectedHasAccount = useMemo(() => {
+    // Live account check: the preloaded STAFF list gives an instant answer,
+    // then /auth/check-account (any role) refines it so an existing account
+    // is never mistaken for a new one.
+    useEffect(() => {
+        let cancelled = false;
         const email = String(form.email || "").trim().toLowerCase();
-        return Boolean(email && registeredEmailSet.has(email));
+
+        if (!email) {
+            setHasAccount(false);
+            setCheckingAccount(false);
+            return undefined;
+        }
+
+        setHasAccount(registeredEmailSet.has(email));
+        setCheckingAccount(true);
+
+        const timer = setTimeout(async () => {
+            try {
+                const response = await checkAccountEmail(email);
+                if (!cancelled) setHasAccount(Boolean(response?.data?.exists));
+            } catch (err) {
+                console.error(err);
+                if (!cancelled) setHasAccount(false);
+            } finally {
+                if (!cancelled) setCheckingAccount(false);
+            }
+        }, 350);
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
     }, [form.email, registeredEmailSet]);
 
-    const showPasswordField = Boolean(selectedEmployee) && !selectedHasAccount;
+    const selectedHasAccount = hasAccount;
+
+    // The password field only applies to directory picks: it creates the
+    // account when none exists and stays disabled when one does.
+    const showPasswordField = Boolean(selectedEmployee);
 
     const handleSelectEmployee = (employee) => {
         if (!employee) {
@@ -108,7 +142,17 @@ function AddResourceModal({ projectId, projectCode, projectName, existingEmails 
     };
 
     const handleChange = (e) => {
-        setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+        setForm((prev) => {
+            const next = { ...prev, [e.target.name]: e.target.value };
+
+            // A default password belongs to the account created for this
+            // email — never carry it over to a different person.
+            if (e.target.name === "email" && e.target.value !== prev.email) {
+                next.password = "";
+            }
+
+            return next;
+        })
     }
 
     const handleSubmit = async (e) => {
@@ -123,7 +167,7 @@ function AddResourceModal({ projectId, projectCode, projectName, existingEmails 
             return;
         }
 
-        if (showPasswordField && !form.password) {
+        if (showPasswordField && !selectedHasAccount && !checkingAccount && !form.password) {
             showNotification({
                 type: "error",
                 title: "Missing password",
@@ -304,18 +348,31 @@ function AddResourceModal({ projectId, projectCode, projectName, existingEmails 
                         {showPasswordField && (
                             <div className='flex flex-col gap-1.5 sm:col-span-2'>
                                 <label className={labelClass}>
-                                    Default password <span className='text-[#B42318]'>*</span>
+                                    Default password{!selectedHasAccount && !checkingAccount && (
+                                        <span className='text-[#B42318]'> *</span>
+                                    )}
                                 </label>
                                 <input
                                     type="text"
                                     name="password"
                                     value={form.password}
                                     onChange={handleChange}
-                                    placeholder='e.g. Welcome123'
-                                    className={inputClass}
+                                    disabled={selectedHasAccount || checkingAccount}
+                                    placeholder={
+                                        checkingAccount
+                                            ? "Checking if an account exists…"
+                                            : selectedHasAccount
+                                                ? "No password needed — account already exists"
+                                                : "e.g. Welcome123"
+                                    }
+                                    className={`${inputClass} ${selectedHasAccount || checkingAccount ? "opacity-60 cursor-not-allowed bg-[#F1F1F1]" : ""}`}
                                 />
                                 <p className='font-normal text-[12px]/[18px] text-[#667085]'>
-                                    No account exists for this email yet — submitting creates a STAFF account with this password. The staff member receives it by email and must change it on first login.
+                                    {checkingAccount
+                                        ? "Checking whether this email already has a portal account…"
+                                        : selectedHasAccount
+                                            ? "This email already has a portal account — they will be added as a resource without creating a new one."
+                                            : "No account exists for this email yet — submitting creates a STAFF account with this password. The staff member receives it by email and must change it on first login."}
                                 </p>
                             </div>
                         )}
@@ -327,7 +384,7 @@ function AddResourceModal({ projectId, projectCode, projectName, existingEmails 
                         className='w-full h-11 rounded-lg text-[#FFFFFF] font-medium bg-[#1B3C4A] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-80'
                     >
                         <i className="fa-regular fa-circle-check text-[#FFFFFF]"></i>
-                        {loading ? "Adding..." : showPasswordField ? "Add Resource & Create Account" : "Add Resource"}
+                        {loading ? "Adding..." : showPasswordField && !selectedHasAccount && !checkingAccount ? "Add Resource & Create Account" : "Add Resource"}
                     </button>
                 </form>
             </div>

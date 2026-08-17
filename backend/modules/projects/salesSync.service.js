@@ -177,6 +177,8 @@ export const syncProjects = async (projects) => {
 export const syncSalesProjects = async () => {
     const projects = await fetchSalesProjects();
 
+    // console.log(projects);
+
     if (!Array.isArray(projects)) {
         throw new Error("Invalid Sales API response");
     }

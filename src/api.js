@@ -143,6 +143,18 @@ export const getStaff = async () => {
   }
 };
 
+export const checkAccountEmail = async (email) => {
+  try {
+    const { data } = await api.get("/auth/check-account", {
+      params: { email },
+    });
+
+    return data;
+  } catch (error) {
+    return normalizeError(error, "Account Check Error");
+  }
+};
+
 export const getEmployees = async () => {
   try {
     const { data } = await api.get("/auth/employees");

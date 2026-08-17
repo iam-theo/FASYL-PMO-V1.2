@@ -5,6 +5,7 @@ import {
   logoutUser,
   getProjectManagersService,
   getStaffService,
+  checkAccountByEmailService,
   signupUser,
   getXnetEmployeesService,
   createUserAccountService,
@@ -178,6 +179,27 @@ export const getStaff = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch staff",
+      error: err.message,
+    });
+  }
+};
+
+// CHECK ACCOUNT EXISTENCE (any role, used by the Add Resource flow)
+
+export const checkAccount = async (req, res) => {
+  try {
+    const email = req.query.email || "";
+    const result = await checkAccountByEmailService(email);
+
+    return res.status(200).json({
+      success: true,
+      message: result.exists ? "Account exists" : "No account found",
+      data: result,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to check account",
       error: err.message,
     });
   }

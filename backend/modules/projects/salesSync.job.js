@@ -3,7 +3,7 @@ import { syncSalesProjects } from "./salesSync.service.js";
 
 export const startSalesSync = () => {
     // runs every 5 minutes
-    cron.schedule("*/10 * * * *", async () => {
+    cron.schedule("*/1 * * * *", async () => {
         try {
             await syncSalesProjects();
 
