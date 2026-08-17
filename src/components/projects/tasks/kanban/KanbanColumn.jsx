@@ -11,7 +11,8 @@ function KanbanColumn({
     onDropTask,
     onDragStart,
     onDragEnd,
-    readOnly = false
+    readOnly = false,
+    completed = false
 }) {
     
     const columnIndex = STATUS_COLUMNS.findIndex((c) => c.key === column.key)
@@ -54,7 +55,7 @@ function KanbanColumn({
                     ? `0 0 0 2px ${theme.ring}, 0 16px 32px -12px rgba(16, 24, 40, 0.18)`
                     : '0 1px 2px 0 rgba(16, 24, 40, 0.04)',
             }}
-            {...(!readOnly
+            {...(!readOnly && !completed
                 ? {
                       onDragEnter: handleDragEnter,
                       onDragOver: (e) => e.preventDefault(),
@@ -126,6 +127,7 @@ function KanbanColumn({
                         onDragStart={onDragStart}
                         onDragEnd={onDragEnd}
                         readOnly={readOnly}
+                        completed={completed}
                     />
                 ))}
             </div>

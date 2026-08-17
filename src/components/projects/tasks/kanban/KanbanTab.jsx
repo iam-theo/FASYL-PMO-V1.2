@@ -110,6 +110,7 @@ function KanbanTab({
                                 onDragStart={setDraggingTaskId}
                                 onDragEnd={() => setDraggingTaskId(null)}
                                 readOnly={readOnly}
+                                completed={completed}
                             />
                         ))}
                     </div>

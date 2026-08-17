@@ -740,7 +740,7 @@ function TasksTab({
                                                         )}
                                                     </td>
                                                     <td className='px-6 py-4'>
-                                                        {viewOnly ? (
+                                                        {viewOnly || isProjectCompleted ? (
                                                             <span className='inline-flex items-center rounded-lg px-3.5 py-2.5 font-normal text-[12px]/[24px] text-[#667085] bg-[#F2F4F7]'>
                                                                 {TASK_STATUS_LABELS[task.status] ?? task.status}
                                                             </span>

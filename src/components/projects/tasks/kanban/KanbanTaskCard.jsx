@@ -14,7 +14,8 @@ function KanbanTaskCard({
     onDelete,
     onDragStart,
     onDragEnd,
-    readOnly = false
+    readOnly = false,
+    completed = false
 }) {
 
     const [isDragging, setIsDragging] = useState(false)
@@ -38,12 +39,14 @@ function KanbanTaskCard({
     const primaryAssignee = assigneeNames[0] ?? 'Unassigned'
     const extraCount = assigneeNames.length - 1
 
+    const frozen = readOnly || completed
+
     return (
         <div
-            draggable={!readOnly}
-            onDragStart={!readOnly ? handleDragStart : undefined}
-            onDragEnd={!readOnly ? handleDragEnd : undefined}
-            className={`group flex select-none gap-3 rounded-xl border bg-[#FFFFFF] p-3 transition-all duration-200 ${readOnly ? "" : "cursor-grab active:cursor-grabbing"} ${
+            draggable={!frozen}
+            onDragStart={!frozen ? handleDragStart : undefined}
+            onDragEnd={!frozen ? handleDragEnd : undefined}
+            className={`group flex select-none gap-3 rounded-xl border bg-[#FFFFFF] p-3 transition-all duration-200 ${frozen ? "" : "cursor-grab active:cursor-grabbing"} ${
                 isDragging
                     ? 'rotate-1 scale-[0.98] border-[#D0D5DD] opacity-60 shadow-[0_16px_32px_-12px_rgba(16,24,40,0.3)]'
                     : 'border-[#0000000D] shadow-[0_1px_2px_0_rgba(16,24,40,0.05)] hover:-translate-y-0.5 hover:shadow-[0_10px_24px_-10px_rgba(16,24,40,0.18)]'
@@ -141,7 +144,7 @@ function KanbanTaskCard({
                         </div>
                     )}
 
-                    {!readOnly && (
+                    {!frozen && (
                         <div className='flex items-center gap-2'>
                             <button
                                 type="button"

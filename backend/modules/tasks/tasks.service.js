@@ -380,6 +380,7 @@ export const getAssignedTaskCountService = async (user) => {
         const projects = await prisma.project.findMany({
             select: {
                 id: true,
+                workflowStatus: true,
                 resources: true
             }
         });
@@ -389,6 +390,11 @@ export const getAssignedTaskCountService = async (user) => {
         const recordIds = [];
 
         for (const project of projects) {
+            // Projects whose Project Closure stage has been signed off are
+            // frozen — their tasks no longer count as live assigned tasks.
+            // DONE tasks on active projects still count.
+            if (project.workflowStatus === WorkflowStatus.COMPLETED) continue;
+
             const resources = Array.isArray(project.resources)
                 ? project.resources
                 : [];
@@ -556,11 +562,28 @@ export const updateTaskService = async (
             id: taskId
         },
         include: {
-            assignedResources: true
+            assignedResources: true,
+            project: {
+                select: {
+                    workflowStatus: true
+                }
+            }
         }
     });
 
     if(!task) throw new Error("Task not found")
+
+    // A completed project (Project Closure stage signed off) is frozen — task
+    // status updates are disabled for every role, including staff proof
+    // submissions (which change status to PENDING_CONFIRMATION).
+    if (
+        task.project?.workflowStatus === WorkflowStatus.COMPLETED &&
+        body.status !== undefined
+    ) {
+        throw new Error(
+            "This project has been completed — task status updates are disabled."
+        );
+    }
 
     if (user && user.role === ROLES.HEADOFOPS) {
         if (body.assignedToUserId !== undefined) {
