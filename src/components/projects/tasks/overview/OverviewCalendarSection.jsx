@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { CalendarIcon } from '../icons'
 import { WEEKDAYS, formatDateKey, getMonthMatrix, getMonthLabel } from '../calender/calendarUtils'
 
-function OverviewCalendarSection({ tasks = [], onNavigate }) {
+function OverviewCalendarSection({ tasks = [], onNavigate, onTaskClick }) {
     const currentDate = useMemo(() => new Date(), [])
 
     const cells = useMemo(
@@ -97,13 +97,20 @@ function OverviewCalendarSection({ tasks = [], onNavigate }) {
 
                                     <div className='flex flex-col gap-0.5'>
                                         {items.slice(0, 1).map(({ task, type }) => (
-                                            <span
+                                            <button
                                                 key={`${task.id}-${type}`}
+                                                type="button"
                                                 title={`${type === "start" ? "Start" : "Due"}: ${task.title}`}
-                                                className='rounded px-1 py-0.5 font-medium text-[9px]/[11px] text-[#090909] bg-[#EBEBEB] truncate'
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (typeof onTaskClick === "function") {
+                                                        onTaskClick(task);
+                                                    }
+                                                }}
+                                                className='rounded px-1 py-0.5 font-medium text-[9px]/[11px] text-[#090909] bg-[#EBEBEB] truncate text-left cursor-pointer hover:bg-[#E0E0E0] transition-colors'
                                             >
                                                 {type === "start" ? "Start" : "Due"}: {task.title}
-                                            </span>
+                                            </button>
                                         ))}
                                         {items.length > 1 && (
                                             <span className='font-medium text-[9px] text-[#636363]'>+{items.length - 1} more</span>

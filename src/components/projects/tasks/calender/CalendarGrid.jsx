@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import CalendarDayCell from './CalendarDayCell'
 import { WEEKDAYS, formatDateKey, getMonthMatrix } from './calendarUtils'
 
-function CalendarGrid({ currentDate, tasks }) {
+function CalendarGrid({ currentDate, tasks, onTaskClick }) {
 
     const cells = useMemo(
         () => getMonthMatrix(currentDate.getFullYear(), currentDate.getMonth()),
@@ -58,6 +58,7 @@ function CalendarGrid({ currentDate, tasks }) {
                                 currentMonth={currentMonth}
                                 isToday={key === todayKey}
                                 items={itemsByDate[key] ?? []}
+                                onTaskClick={onTaskClick}
                             />
                         )
                     })}

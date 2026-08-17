@@ -10,7 +10,8 @@ function KanbanColumn({
     onDelete,
     onDropTask,
     onDragStart,
-    onDragEnd 
+    onDragEnd,
+    readOnly = false
 }) {
     
     const columnIndex = STATUS_COLUMNS.findIndex((c) => c.key === column.key)
@@ -53,10 +54,14 @@ function KanbanColumn({
                     ? `0 0 0 2px ${theme.ring}, 0 16px 32px -12px rgba(16, 24, 40, 0.18)`
                     : '0 1px 2px 0 rgba(16, 24, 40, 0.04)',
             }}
-            onDragEnter={handleDragEnter}
-            onDragOver={(e) => e.preventDefault()}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
+            {...(!readOnly
+                ? {
+                      onDragEnter: handleDragEnter,
+                      onDragOver: (e) => e.preventDefault(),
+                      onDragLeave: handleDragLeave,
+                      onDrop: handleDrop,
+                  }
+                : {})}
         >
             {/* Accent strip */}
             <div
@@ -120,6 +125,7 @@ function KanbanColumn({
                         onDelete={onDelete}
                         onDragStart={onDragStart}
                         onDragEnd={onDragEnd}
+                        readOnly={readOnly}
                     />
                 ))}
             </div>

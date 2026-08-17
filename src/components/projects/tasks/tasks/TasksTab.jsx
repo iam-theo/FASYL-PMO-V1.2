@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronDownIcon, CheckboxCheckIcon, MoreVerticalIcon, TrashIcon, PlusCircleIcon } from '../icons'
 import CreateTaskModal from './CreateTaskModal'
 import DeleteTaskModal from './DeleteTaskModal'
@@ -27,6 +27,8 @@ function TasksTab({
     // setProject 
     readOnly = false,
     viewOnly = false,
+    focusTaskId = null,
+    onFocusHandled,
 }) {
 
     // console.log(project)
@@ -41,6 +43,7 @@ function TasksTab({
 
     const [view, setView] = useState('list')
     const [selectedIds, setSelectedIds] = useState([])
+    const [flashTaskId, setFlashTaskId] = useState(null)
     const [isEditing, setIsEditing] = useState(false)
     // const [editingTask, setEditingTask] = useState(null)
     const [editValues, setEditValues] = useState(null);
@@ -55,6 +58,44 @@ function TasksTab({
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [deleteTarget, setDeleteTarget] = useState(null) // { ids: [...] } | null
     const [proofTarget, setProofTarget] = useState(null) // task awaiting proof upload
+
+    // A task was clicked on a calendar — jump to its row in the list, clear the
+    // filters so it can't be hidden, and flash-highlight it.
+    useEffect(() => {
+        if (!focusTaskId) return;
+
+        setStatusFilter("All Status");
+        setPriorityFilter("All Priorities");
+        setAssigneeFilter("All Team Members");
+        setDueDateFilter("Due Date");
+        setView("list");
+
+        const targetIndex = tasks.findIndex((t) => t.id === focusTaskId);
+        setCurrentPage(
+            targetIndex >= 0 ? Math.floor(targetIndex / ITEMS_PER_PAGE) + 1 : 1,
+        );
+
+        setFlashTaskId(focusTaskId);
+
+        const scrollTimer = setTimeout(() => {
+            const row = document.getElementById(`task-row-${focusTaskId}`);
+            if (row) {
+                row.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+        }, 150);
+
+        const flashTimer = setTimeout(() => {
+            setFlashTaskId(null);
+            // Clear the focus only after the flash so re-clicking the same task
+            // still re-triggers this effect.
+            onFocusHandled?.();
+        }, 1800);
+
+        return () => {
+            clearTimeout(scrollTimer);
+            clearTimeout(flashTimer);
+        };
+    }, [focusTaskId, tasks, onFocusHandled]);
 
     const assigneeOptions = useMemo(() => {
         const members = [...resources, ...tasks.map(t => t.assignedTo)]
@@ -434,7 +475,7 @@ function TasksTab({
                     </div>
 
                     <div className='flex items-center gap-3'>
-                        {!effectiveReadOnly && tasksEnabled && <ViewToggle view={view} onChange={setView} />}
+                        {tasksEnabled && <ViewToggle view={view} onChange={setView} />}
 
                         {!effectiveReadOnly && tasksEnabled && (
                             <button
@@ -533,7 +574,7 @@ function TasksTab({
             </div>
 
             {
-                !effectiveReadOnly && view === 'kanban' &&
+                view === 'kanban' &&
                     (
                         <KanbanTab
                             tasks={tasks}
@@ -545,6 +586,7 @@ function TasksTab({
                             // viewToggle={<ViewToggle view={view} onChange={setView} />}
                             setDeleteTarget={setDeleteTarget}
                             tasksEnabled={tasksEnabled}
+                            readOnly={effectiveReadOnly}
                         />
                     )
             }
@@ -590,8 +632,10 @@ function TasksTab({
                                             {paginatedTasks.map((task) => (
                                                 <tr 
                                                     key={task.id} 
+                                                    id={`task-row-${task.id}`}
                                                     onClick={effectiveReadOnly ? undefined : () => handleEditTask(task)}
-                                                    className={`border-b border-[#0000000D] last:border-b-0 ${effectiveReadOnly ? "" : "cursor-pointer"}`}>
+                                                    style={flashTaskId === task.id ? { backgroundColor: "#FFF4E5" } : undefined}
+                                                    className={`border-b border-[#0000000D] last:border-b-0 transition-colors duration-700 ${effectiveReadOnly ? "" : "cursor-pointer"}`}>
                                                     {!effectiveReadOnly && (
                                                         <td className='px-6 py-4'>
                                                             <TaskCheckbox

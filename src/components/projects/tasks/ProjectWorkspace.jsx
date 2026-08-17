@@ -29,6 +29,10 @@ function ProjectWorkspace({
 
     const [tasks, setTasks] = useState([]);
 
+    // Set when a task is clicked from a calendar so the Tasks tab can jump to
+    // and highlight that task's row.
+    const [focusTaskId, setFocusTaskId] = useState(null);
+
     const [isAssignPMModalOpen, setIsAssignPMModalOpen] = useState(false)
     const [assignedManager, setAssignedManager] = useState("Select A Project Manager")
 
@@ -159,7 +163,11 @@ function ProjectWorkspace({
                             setTasks={setTasks}
                             onNavigateToTasks={() => setActiveSubTab("tasks")}
                             onNavigateToResources={() => setActiveSubTab("resources")}
-                            onNavigateToCalendar={canManageTasksAndReports ? () => setActiveSubTab("calendar") : undefined}
+                            onNavigateToCalendar={() => setActiveSubTab("calendar")}
+                            onTaskSelect={(taskId) => {
+                                setFocusTaskId(taskId);
+                                setActiveSubTab("tasks");
+                            }}
                             readOnly={isStaff}
                             viewOnly={isHeadOfOps}
                         />
@@ -199,14 +207,20 @@ function ProjectWorkspace({
                         setProject={setProject}
                         readOnly={isStaff}
                         viewOnly={isHeadOfOps}
+                        focusTaskId={focusTaskId}
+                        onFocusHandled={() => setFocusTaskId(null)}
                     />
                 )}
 
-                {canManageTasksAndReports && activeSubTab === "calendar" && (
+                {activeSubTab === "calendar" && (
                     <CalendarTab 
                         tasks={tasks} 
                         setTasks={setTasks} 
-                        viewOnly={isHeadOfOps}
+                        viewOnly={!canManageTasksAndReports}
+                        onTaskClick={(task) => {
+                            setFocusTaskId(task?.id);
+                            setActiveSubTab("tasks");
+                        }}
                     />
                 )}
 

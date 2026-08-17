@@ -11,7 +11,8 @@ function KanbanTab({
     openModal,
     updatePriority,
     setDeleteTarget,
-    tasksEnabled = true
+    tasksEnabled = true,
+    readOnly = false
 }) {
 
     const tasksByStatus = useMemo(() => {
@@ -93,7 +94,7 @@ function KanbanTab({
 
             <div className='flex-1 min-h-0 overflow-y-auto no-scrollbar px-4 py-4'>
                 {tasks.length === 0 ? (
-                    <KanbanEmptyState onCreateTask={() => openModal(true)} tasksEnabled={tasksEnabled} />
+                    <KanbanEmptyState onCreateTask={() => openModal(true)} tasksEnabled={tasksEnabled} readOnly={readOnly} />
                 ) : (
                     <div className='flex items-start gap-3 h-full overflow-x-auto no-scrollbar'>
                         {STATUS_COLUMNS.map((column) => (
@@ -107,6 +108,7 @@ function KanbanTab({
                                 onDropTask={handleDropTask}
                                 onDragStart={setDraggingTaskId}
                                 onDragEnd={() => setDraggingTaskId(null)}
+                                readOnly={readOnly}
                             />
                         ))}
                     </div>
@@ -116,7 +118,19 @@ function KanbanTab({
     )
 }
 
-function KanbanEmptyState({ onCreateTask, tasksEnabled = true }) {
+function KanbanEmptyState({ onCreateTask, tasksEnabled = true, readOnly = false }) {
+    const heading = readOnly
+        ? 'No tasks assigned to you'
+        : tasksEnabled
+            ? 'You have not created any tasks'
+            : 'Tasks are locked for this stage';
+
+    const description = readOnly
+        ? 'Tasks assigned to you will appear here.'
+        : tasksEnabled
+            ? 'Click the buttton below to create a new task.'
+            : 'Task assignment opens once the project reaches Planning (stage 4).';
+
     return (
         <div className='flex items-center justify-center py-20 px-4'>
             <div className='w-full max-w-88 flex flex-col items-center gap-6 text-center'>
@@ -125,11 +139,11 @@ function KanbanEmptyState({ onCreateTask, tasksEnabled = true }) {
                         <i className="fa-solid fa-table-columns fa-xl text-[#DBDBDB]"></i>
                     </div>
                     <div className='flex flex-col items-center gap-1'>
-                        <h3 className='font-medium text-[16px]/[24px] text-[#090909]'>{tasksEnabled ? 'You have not created any tasks' : 'Tasks are locked for this stage'}</h3>
-                        <p className='font-normal text-[14px]/[20px] text-[#636363]'>{tasksEnabled ? 'Click the buttton below to create a new task.' : 'Task assignment opens once the project reaches Planning (stage 4).'}</p>
+                        <h3 className='font-medium text-[16px]/[24px] text-[#090909]'>{heading}</h3>
+                        <p className='font-normal text-[14px]/[20px] text-[#636363]'>{description}</p>
                     </div>
                 </div>
-                {tasksEnabled && (
+                {!readOnly && tasksEnabled && (
                     <button
                         type="button"
                         onClick={onCreateTask}

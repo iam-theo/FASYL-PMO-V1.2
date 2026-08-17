@@ -15,7 +15,7 @@ const fetchSalesProjects = async () => {
 
 const mapSalesToPMOProject = (p) => {
     return {
-        externalId: p.projectId,
+        projectId: p.projectId,
 
         projectName: p.name,
         status: p.status,
@@ -49,11 +49,11 @@ export const syncProjects = async (projects) => {
         const mapped = mapSalesToPMOProject(p);
 
         const existing = await prisma.project.findUnique({
-            where: { projectId: mapped.externalId },
+            where: { projectId: mapped.projectId },
         });
 
         const project = await prisma.project.upsert({
-            where: { projectId: mapped.externalId },
+            where: { projectId: mapped.projectId },
 
             update: {
                 ...mapped,
@@ -68,7 +68,11 @@ export const syncProjects = async (projects) => {
         });
 
         if (!existing) {
-            await buildWorkflowForProject(project.id);
+            await buildWorkflowForProject(project.projectId);
+
+            console.log(
+                `Workflow created for new project: ${project.projectId}`
+            );
             
             // const heads = await prisma.user.findMany({
             //     where: {

@@ -1,5 +1,9 @@
 
-function CalendarDayCell({ date, currentMonth, isToday, items }) {
+function CalendarDayCell({ date, currentMonth, isToday, items, onTaskClick }) {
+    const handleTaskClick = (task) => {
+        if (typeof onTaskClick === "function") onTaskClick(task);
+    };
+
     return (
         <div
             className={`flex flex-col gap-1.5 min-h-37 p-2.5 border border-[#E8E8E8] overflow-hidden ${
@@ -20,13 +24,15 @@ function CalendarDayCell({ date, currentMonth, isToday, items }) {
 
             <div className='flex flex-col gap-1 overflow-y-auto no-scrollbar'>
                 {items.map(({ task, type }) => (
-                    <span
+                    <button
                         key={`${task.id}-${type}`}
+                        type="button"
                         title={`${type === "start" ? "Start" : "Due"}: ${task.title}`}
-                        className={`rounded px-1.5 py-1 font-medium text-[11px]/[14px] bg-[#EBEBEB] truncate ${type === "start" ? "text-[#12B76A]" : "text-[#F5A200]"}`}
+                        onClick={() => handleTaskClick(task)}
+                        className={`rounded px-1.5 py-1 font-medium text-[11px]/[14px] bg-[#EBEBEB] truncate text-left cursor-pointer hover:bg-[#E0E0E0] transition-colors ${type === "start" ? "text-[#12B76A]" : "text-[#F5A200]"}`}
                     >
                         {type === "start" ? "Start" : "Due"}: {task.title}
-                    </span>
+                    </button>
                 ))}
             </div>
         </div>

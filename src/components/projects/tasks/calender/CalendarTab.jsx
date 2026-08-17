@@ -7,7 +7,7 @@ import { getMonthLabel } from "./calendarUtils";
 import ExportMenu from "../ExportMenu";
 import { taskExportColumns } from "../exportConfig";
 
-function CalendarTab({ tasks, setTasks, viewOnly = false }) {
+function CalendarTab({ tasks, setTasks, viewOnly = false, onTaskClick }) {
   const [currentDate, setCurrentDate] = useState(() => new Date());
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
@@ -90,7 +90,7 @@ function CalendarTab({ tasks, setTasks, viewOnly = false }) {
           </div>
         </div>
 
-        <CalendarGrid currentDate={currentDate} tasks={tasks} />
+        <CalendarGrid currentDate={currentDate} tasks={tasks} onTaskClick={onTaskClick} />
       </div>
 
       {isCreateModalOpen && (

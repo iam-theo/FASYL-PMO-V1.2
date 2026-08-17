@@ -8,9 +8,9 @@ export const PROJECT_WORKSPACE_TABS = [
   { key: "reports", label: "Reports" },
 ];
 
-// Tasks (a task view) is visible to all roles; the calendar, reports and
+// Tasks, calendar and a task view are visible to all roles; reports and the
 // project lifecycle are restricted to PM/HOPS.
-const RESTRICTED_WORKSPACE_TABS = new Set(["calendar", "reports", "project_lifecycle"]);
+const RESTRICTED_WORKSPACE_TABS = new Set(["reports", "project_lifecycle"]);
 const TASK_REPORT_ROLES = ["HEADOFOPS", "PROJECTMANAGER"];
 
 function ProjectSubTabs({ activeTab, onTabChange, user }) {

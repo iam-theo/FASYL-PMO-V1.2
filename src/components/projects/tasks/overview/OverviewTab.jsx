@@ -18,6 +18,7 @@ function OverviewTab({
   onNavigateToTasks,
   onNavigateToResources,
   onNavigateToCalendar,
+  onTaskSelect,
   readOnly = false,
   viewOnly = false,
 }) {
@@ -55,7 +56,11 @@ function OverviewTab({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <OverviewCalendarSection tasks={tasks} onNavigate={onNavigateToCalendar} />
+        <OverviewCalendarSection
+          tasks={tasks}
+          onNavigate={onNavigateToCalendar}
+          onTaskClick={onTaskSelect}
+        />
         <OverviewReminderSection project={project} onNavigate={onNavigateToTasks} />
         {/* <OverviewResourcesSection resources={resources} /> */}
       </div>
