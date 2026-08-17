@@ -28,6 +28,8 @@ function ResourcesTab({ project, onProjectUpdate, canManageResources = false }) 
 
   const resources = useMemo(() => project?.resources || [], [project?.resources]);
 
+  console.log(resources);
+
   const totalPages = Math.max(1, Math.ceil(resources.length / ITEMS_PER_PAGE));
 
   const paginatedResources = useMemo(() => {
