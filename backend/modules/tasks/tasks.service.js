@@ -650,7 +650,18 @@ export const updateTaskService = async (
             (resource) => (resource.email || "").toLowerCase() === email
         );
 
-        if (!me || task.assignedResourceId !== me.recordId) {
+        // A task's assignment lives in two places: the legacy single
+        // assignedResourceId column (the first-selected resource) and the
+        // TaskResource join table (every assigned resource). Any assigned
+        // staff member may update the task, not just the first-listed one.
+        const isAssigned =
+            task.assignedResourceId === me?.recordId ||
+            (Array.isArray(task.assignedResources) &&
+                task.assignedResources.some(
+                    (assignment) => assignment.resourceId === me?.recordId
+                ));
+
+        if (!me || !isAssigned) {
             throw new Error("You are not authorized to update this task");
         }
 
