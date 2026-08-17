@@ -41,6 +41,10 @@ function TasksTab({
 
     const tasksEnabled = areTasksEnabledForProject(project);
 
+    // Once the Project Closure stage is signed off the project is complete
+    // (workflowStatus COMPLETED) — no new tasks may be created.
+    const isProjectCompleted = project?.workflowStatus === "COMPLETED";
+
     const [view, setView] = useState('list')
     const [selectedIds, setSelectedIds] = useState([])
     const [flashTaskId, setFlashTaskId] = useState(null)
@@ -487,7 +491,7 @@ function TasksTab({
                             </button>
                         )}
 
-                        {!effectiveReadOnly && tasksEnabled && (
+                        {!effectiveReadOnly && tasksEnabled && !isProjectCompleted && (
                             <button
                                 type="button"
                                 onClick={() => setIsCreateModalOpen(true)}
@@ -587,6 +591,7 @@ function TasksTab({
                             setDeleteTarget={setDeleteTarget}
                             tasksEnabled={tasksEnabled}
                             readOnly={effectiveReadOnly}
+                            completed={isProjectCompleted}
                         />
                     )
             }
@@ -599,6 +604,7 @@ function TasksTab({
                                 <TasksEmptyState
                                     readOnly={effectiveReadOnly}
                                     locked={!tasksEnabled && !effectiveReadOnly}
+                                    completed={isProjectCompleted}
                                     onCreateTask={() => setIsCreateModalOpen(true)}
                                 />
                             ) : (
@@ -938,7 +944,7 @@ function FilterSelect({ value, onChange, options }) {
     )
 }
 
-function TasksEmptyState({ onCreateTask, readOnly = false, locked = false }) {
+function TasksEmptyState({ onCreateTask, readOnly = false, locked = false, completed = false }) {
     return (
         <div className='flex items-center justify-center py-20 px-4'>
             <div className='w-full max-w-88 flex flex-col items-center gap-6 text-center'>
@@ -947,11 +953,11 @@ function TasksEmptyState({ onCreateTask, readOnly = false, locked = false }) {
                         <i className="fa-solid fa-list-check fa-xl text-[#DBDBDB]"></i>
                     </div>
                     <div className='flex flex-col items-center gap-1'>
-                        <h3 className='font-medium text-[16px]/[24px] text-[#090909]'>{locked ? 'Tasks are locked for this stage' : readOnly ? 'No tasks assigned to you' : 'You have not created any tasks'}</h3>
-                        <p className='font-normal text-[14px]/[20px] text-[#636363]'>{locked ? 'Task assignment opens once the project reaches Planning (stage 4).' : readOnly ? 'Tasks assigned to you will appear here.' : 'Click the buttton below to create a new task.'}</p>
+                        <h3 className='font-medium text-[16px]/[24px] text-[#090909]'>{completed ? 'This project has been completed' : locked ? 'Tasks are locked for this stage' : readOnly ? 'No tasks assigned to you' : 'You have not created any tasks'}</h3>
+                        <p className='font-normal text-[14px]/[20px] text-[#636363]'>{completed ? 'No new tasks can be created.' : locked ? 'Task assignment opens once the project reaches Planning (stage 4).' : readOnly ? 'Tasks assigned to you will appear here.' : 'Click the buttton below to create a new task.'}</p>
                     </div>
                 </div>
-                {!readOnly && !locked && (
+                {!completed && !readOnly && !locked && (
                     <button
                         type="button"
                         onClick={onCreateTask}

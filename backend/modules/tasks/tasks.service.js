@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, WorkflowStatus } from "@prisma/client";
 import { ROLES } from "../../constants/roles.js";
 import { formatTask } from "./tasks.utils.js";
 // import { createReminderService } from "../reminders/reminder.service.js";
@@ -102,6 +102,14 @@ export const createTaskService = async (body, user, document = null) => {
     if ((project.currentStageOrder ?? 0) < TASKS_ENABLED_FROM_STAGE) {
         throw new Error(
             "Task assignment is not enabled yet. Stages 1-3 (Client ID, Engagement, Initiation) must be signed off before the project reaches Planning (stage 4)."
+        );
+    }
+
+    // Once the Project Closure stage (stage 8) has been signed off the project
+    // is complete — no new tasks may be created.
+    if (project.workflowStatus === WorkflowStatus.COMPLETED) {
+        throw new Error(
+            "This project has been completed — no new tasks can be created."
         );
     }
 
