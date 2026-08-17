@@ -71,21 +71,21 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use((req, res, next) => {
-  console.log("========== REQUEST ==========");
-  console.log("Method:", req.method);
-  console.log("URL:", req.originalUrl);
-  console.log("Origin:", req.headers.origin);
-  console.log("Access-Control-Request-Method:",
-      req.headers["access-control-request-method"]
-  );
-  console.log("Access-Control-Request-Headers:",
-      req.headers["access-control-request-headers"]
-  );
-  console.log("=============================");
+// app.use((req, res, next) => {
+//   console.log("========== REQUEST ==========");
+//   console.log("Method:", req.method);
+//   console.log("URL:", req.originalUrl);
+//   console.log("Origin:", req.headers.origin);
+//   console.log("Access-Control-Request-Method:",
+//       req.headers["access-control-request-method"]
+//   );
+//   console.log("Access-Control-Request-Headers:",
+//       req.headers["access-control-request-headers"]
+//   );
+//   console.log("=============================");
 
-  next();
-});
+//   next();
+// });
 
 const corsOptions = {
   origin: (origin, callback) => {
