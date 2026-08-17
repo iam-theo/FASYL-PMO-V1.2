@@ -113,7 +113,7 @@ function ResourcesTab({ project, onProjectUpdate, canManageResources = false }) 
       <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-4 py-4">
         {resources.length === 0 ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-5 py-16">
-            <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1B3C4A] to-[#2E6B7E] text-[#FFFFFF] shadow-card-hover">
+            <span className="flex min-h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1B3C4A] to-[#2E6B7E] text-[#FFFFFF] shadow-card-hover">
               <i className="fa-solid fa-users text-[22px]"></i>
             </span>
             <div className="text-center">
@@ -130,7 +130,7 @@ function ResourcesTab({ project, onProjectUpdate, canManageResources = false }) 
               <button
                 type="button"
                 onClick={() => setIsAddModalOpen(true)}
-                className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#1B3C4A] px-4 font-medium text-[13px]/[20px] text-[#FFFFFF] cursor-pointer hover:bg-[#16313D]"
+                className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#1B3C4A] px-4 font-medium text-[13px]/[20px] text-[#FFFFFF] cursor-pointer hover:bg-[#16313D]"
               >
                 <i className="fa-solid fa-plus text-[#FFFFFF]"></i>
                 Add Resource

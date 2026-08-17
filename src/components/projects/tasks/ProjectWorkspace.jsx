@@ -156,24 +156,39 @@ function ProjectWorkspace({
 
             <div className='flex-1 min-h-0 overflow-y-auto no-scrollbar'>
                 {activeSubTab === "overview" && (
-                    isSetupComplete ? (
-                        <OverviewTab
-                            project={project}
-                            tasks={tasks}
-                            setTasks={setTasks}
-                            onNavigateToTasks={() => setActiveSubTab("tasks")}
-                            onNavigateToResources={() => setActiveSubTab("resources")}
-                            onNavigateToCalendar={() => setActiveSubTab("calendar")}
-                            onTaskSelect={(taskId) => {
-                                setFocusTaskId(taskId);
-                                setActiveSubTab("tasks");
-                            }}
-                            readOnly={isStaff}
-                            viewOnly={isHeadOfOps}
-                        />
-                    ) : (
-                        <ProjectOnboardingEmptyState onSetupProject={() => setIsSetupModalOpen(true)} />
-                    )
+                    // isSetupComplete ? (
+                    //     <OverviewTab
+                    //         project={project}
+                    //         tasks={tasks}
+                    //         setTasks={setTasks}
+                    //         onNavigateToTasks={() => setActiveSubTab("tasks")}
+                    //         onNavigateToResources={() => setActiveSubTab("resources")}
+                    //         onNavigateToCalendar={() => setActiveSubTab("calendar")}
+                    //         onTaskSelect={(taskId) => {
+                    //             setFocusTaskId(taskId);
+                    //             setActiveSubTab("tasks");
+                    //         }}
+                    //         readOnly={isStaff}
+                    //         viewOnly={isHeadOfOps}
+                    //     />
+                    // ) : (
+                    //     <ProjectOnboardingEmptyState onSetupProject={() => setIsSetupModalOpen(true)} />
+                    // )
+
+                    <OverviewTab
+                        project={project}
+                        tasks={tasks}
+                        setTasks={setTasks}
+                        onNavigateToTasks={() => setActiveSubTab("tasks")}
+                        onNavigateToResources={() => setActiveSubTab("resources")}
+                        onNavigateToCalendar={() => setActiveSubTab("calendar")}
+                        onTaskSelect={(taskId) => {
+                            setFocusTaskId(taskId);
+                            setActiveSubTab("tasks");
+                        }}
+                        readOnly={isStaff}
+                        viewOnly={isHeadOfOps}
+                    />
                 )}
 
                 {activeSubTab === "resources" && (
