@@ -56,11 +56,29 @@ export const buildAllocationItems = (tasks) => {
   const countsByAssignee = new Map();
 
   tasks.forEach((task) => {
-    const name = task?.assignee?.fullName || "Unassigned";
-    countsByAssignee.set(name, (countsByAssignee.get(name) || 0) + 1);
+    // Count every assignee on the task, not just the primary one.
+    // A task with 3 staff assigned increments each person's count by 1.
+    const assignees =
+      Array.isArray(task?.assignees) && task.assignees.length > 0
+        ? task.assignees
+        : task?.assignee
+          ? [task.assignee]
+          : [];
+
+    if (assignees.length === 0) {
+      countsByAssignee.set(
+        "Unassigned",
+        (countsByAssignee.get("Unassigned") || 0) + 1,
+      );
+    } else {
+      assignees.forEach((a) => {
+        const name = a?.fullName || "Unassigned";
+        countsByAssignee.set(name, (countsByAssignee.get(name) || 0) + 1);
+      });
+    }
   });
 
-  const total = tasks.length;
+  const total = [...countsByAssignee.values()].reduce((sum, c) => sum + c, 0);
   return [...countsByAssignee.entries()].map(([label, count], index) => ({
     label,
     color: ASSIGNEE_COLORS[index % ASSIGNEE_COLORS.length],

@@ -639,7 +639,7 @@ function TasksTab({
                                                 <tr 
                                                     key={task.id} 
                                                     id={`task-row-${task.id}`}
-                                                    onClick={effectiveReadOnly ? undefined : () => handleEditTask(task)}
+                                                    onClick={effectiveReadOnly || isProjectCompleted ? undefined : () => handleEditTask(task)}
                                                     style={flashTaskId === task.id ? { backgroundColor: "#FFF4E5" } : undefined}
                                                     className={`border-b border-[#0000000D] last:border-b-0 transition-colors duration-700 ${effectiveReadOnly ? "" : "cursor-pointer"}`}>
                                                     {!effectiveReadOnly && (

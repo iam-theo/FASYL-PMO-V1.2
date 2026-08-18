@@ -576,12 +576,12 @@ export const updateTaskService = async (
     // A completed project (Project Closure stage signed off) is frozen — task
     // status updates are disabled for every role, including staff proof
     // submissions (which change status to PENDING_CONFIRMATION).
-    if (
-        task.project?.workflowStatus === WorkflowStatus.COMPLETED &&
-        body.status !== undefined
-    ) {
+    // A completed project (Project Closure stage signed off) is frozen —
+    // no edits of any kind are allowed (status, title, priority, dates,
+    // assignees).
+    if (task.project?.workflowStatus === WorkflowStatus.COMPLETED) {
         throw new Error(
-            "This project has been completed — task status updates are disabled."
+            "This project has been completed — no further changes are allowed."
         );
     }
 

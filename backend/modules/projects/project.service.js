@@ -774,6 +774,12 @@ export const addResourceToProjectService = async (projectId, data, user) => {
     );
   }
 
+  // A completed project (Project Closure stage signed off) is frozen —
+  // resources can no longer be added or removed.
+  if (project.workflowStatus === "COMPLETED") {
+    throw new Error("This project has been completed — resource changes are disabled.");
+  }
+
   const resources = Array.isArray(project.resources) ? project.resources : [];
 
   const email = String(data.email || "").trim().toLowerCase();
@@ -870,6 +876,12 @@ export const removeResourceFromProjectService = async (projectId, recordId, user
     throw new Error(
       "Only the assigned project manager can manage resources on this project"
     );
+  }
+
+  // A completed project (Project Closure stage signed off) is frozen —
+  // resources can no longer be added or removed.
+  if (project.workflowStatus === "COMPLETED") {
+    throw new Error("This project has been completed — resource changes are disabled.");
   }
 
   const resources = Array.isArray(project.resources) ? project.resources : [];

@@ -20,6 +20,8 @@ const resourceExportColumns = [
 function ResourcesTab({ project, onProjectUpdate, canManageResources = false }) {
   // console.log(project)
 
+  const isCompleted = project?.workflowStatus === "COMPLETED";
+
   const [currentPage, setCurrentPage] = useState(1);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [resourceToRemove, setResourceToRemove] = useState(null)
@@ -98,7 +100,7 @@ function ResourcesTab({ project, onProjectUpdate, canManageResources = false }) 
               rows={resources}
             />
 
-            {canManageResources && (
+            {canManageResources && !isCompleted && (
               <button
                 type="button"
                 onClick={() => setIsAddModalOpen(true)}
@@ -110,6 +112,14 @@ function ResourcesTab({ project, onProjectUpdate, canManageResources = false }) 
             )}
           </div>
         </div>
+        {isCompleted && (
+          <div className='mt-3 rounded-lg border border-[#0000000D] bg-[#FFF4E5] p-4 flex items-center gap-3'>
+            <i className="fa-solid fa-lock text-[#B54708]"></i>
+            <p className='font-normal text-[14px]/[20px] text-[#7A2E0E]'>
+              This project has been completed — resource changes are disabled.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-4 py-4">
@@ -128,7 +138,7 @@ function ResourcesTab({ project, onProjectUpdate, canManageResources = false }) 
                   : "This project has no resources assigned yet."}
               </p>
             </div>
-            {canManageResources && (
+            {canManageResources && !isCompleted && (
               <button
                 type="button"
                 onClick={() => setIsAddModalOpen(true)}
@@ -146,7 +156,7 @@ function ResourcesTab({ project, onProjectUpdate, canManageResources = false }) 
                 key={resource.recordId}
                 resource={resource}
                 index={index}
-                onRemove={canManageResources ? setResourceToRemove : undefined}
+                onRemove={canManageResources && !isCompleted ? setResourceToRemove : undefined}
               />
             ))}
           </div>
